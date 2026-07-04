@@ -2,6 +2,10 @@
 
 Per-project dashboard tool. Five modules sit inside each project (Session Log, Build Diary, Rubric, Architecture Map, Consideration Mode), plus a top-level Interface that lists all projects.
 
+## Kanban lifecycle
+
+Four columns: **Building** (actively under construction, not yet usable), **Live** (built, in use, handoff-ready, only earned once a project has passed Deep Test, not just because it's technically running), **Parked** (deliberately set aside, not urgent, not stuck), **Blocked** (stuck on something external). There's no "Active" column, it never had a distinct meaning from Building. There's no "Brain Dump" column either: a project only enters the board once it has a repo (via the "unmapped GitHub repos" panel), and new projects already default to `status: Building` on creation.
+
 ## Stack
 
 - Static site (`index.html`), no build step, deployed to GitHub Pages.
@@ -11,7 +15,7 @@ Per-project dashboard tool. Five modules sit inside each project (Session Log, B
 
 - `index.html` — the Interface: Kanban/list/grid/gallery views of all projects, plus a per-project detail page with Session Log, Rubric, Build Diary, and Architecture Map panels. Architecture Map/Consideration Mode always render the real D3 force graph fetched from Supabase (CDN) — there's no hardcoded demo path in the code anymore.
 - `assets/config.js` — Supabase URL and anon key used by the client.
-- `supabase/schema.sql` — schema for `projects`, `rubric_lenses`, `diary_entries`, `session_log_entries`, `rubric_evolution_log`, `architecture_nodes`, `architecture_edges`, `architecture_snapshots`, `considerations`, and `consideration_affected` (RLS enabled, anon role granted full access since there's no auth layer).
+- `supabase/schema.sql` — schema for `projects`, `rubric_lenses`, `diary_entries`, `session_log_entries`, `rubric_evolution_log`, `architecture_nodes`, `architecture_edges`, `architecture_snapshots`, `considerations`, `consideration_affected`, `github_repos`, `deep_test_items`, `deep_test_runs`, and `tech_stack_items` (RLS enabled, anon role granted full access since there's no auth layer).
 - `scripts/import_architecture_graph.py` — one-off/rerunnable importer: runs `code-review-graph build` against a cloned project repo, reads its local SQLite graph, and loads File nodes plus resolved `IMPORTS_FROM` edges into Supabase for that project.
 - `scripts/log_consideration.py` — computes the blast radius of a proposed change (BFS over the stored `IMPORTS_FROM` edges, reversed) and logs it as a Consideration for the dashboard to display.
 - `scripts/sync_github_repos.py` — syncs the full GitHub repo list into `github_repos`, so the Interface can show which repos aren't a Wayfinder project yet.

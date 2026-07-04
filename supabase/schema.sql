@@ -1,7 +1,8 @@
 -- Wayfinder Supabase schema (project: ueosmjwumqqyswmnbyji)
 -- Applied via migrations: init_projects_schema, seed_initial_projects,
 -- add_session_log_entries, add_rubric_evolution_log, add_architecture_map_tables,
--- add_considerations, add_github_repos_and_project_linking, add_analysis_status_tracking.
+-- add_considerations, add_github_repos_and_project_linking, add_analysis_status_tracking,
+-- status_relabel_deep_test_tech_stack.
 -- No custom backend: this is a static site calling PostgREST directly with
 -- the anon key, so RLS policies grant the anon role full access rather than
 -- gating on auth (single-user internal tool).
@@ -10,7 +11,7 @@ create table projects (
   id text primary key,
   name text not null,
   venture text not null,
-  status text not null check (status in ('Active','Building','Stable','Blocked')),
+  status text not null check (status in ('Building','Live','Parked','Blocked')),
   signal text not null check (signal in ('spiral','friction','clean','breakthrough')),
   last_signal text not null,
   last_activity text not null,
@@ -129,6 +130,42 @@ create table github_repos (
   synced_at timestamptz not null default now()
 );
 
+create table deep_test_items (
+  id bigserial primary key,
+  project_id text not null references projects(id) on delete cascade,
+  function_label text not null,
+  source_node_id bigint references architecture_nodes(id) on delete set null,
+  test_action text not null default '',
+  expected_outcome text not null default '',
+  last_result text not null default 'untested' check (last_result in ('untested','pass','fail')),
+  last_tested_at timestamptz,
+  notes text
+);
+
+create table deep_test_runs (
+  id bigserial primary key,
+  project_id text not null references projects(id) on delete cascade,
+  started_at timestamptz not null default now(),
+  completed_at timestamptz,
+  pass_count int not null default 0,
+  fail_count int not null default 0,
+  total_count int not null default 0
+);
+
+create index deep_test_items_project_idx on deep_test_items(project_id);
+create index deep_test_runs_project_idx on deep_test_runs(project_id);
+
+create table tech_stack_items (
+  id bigserial primary key,
+  project_id text not null references projects(id) on delete cascade,
+  service_name text not null,
+  resource_label text not null,
+  link_url text not null,
+  notes text
+);
+
+create index tech_stack_items_project_idx on tech_stack_items(project_id);
+
 alter table projects enable row level security;
 alter table rubric_lenses enable row level security;
 alter table diary_entries enable row level security;
@@ -140,6 +177,9 @@ alter table architecture_edges enable row level security;
 alter table considerations enable row level security;
 alter table consideration_affected enable row level security;
 alter table github_repos enable row level security;
+alter table deep_test_items enable row level security;
+alter table deep_test_runs enable row level security;
+alter table tech_stack_items enable row level security;
 
 create policy "anon full access" on projects for all using (true) with check (true);
 create policy "anon full access" on rubric_lenses for all using (true) with check (true);
@@ -152,3 +192,6 @@ create policy "anon full access" on architecture_edges for all using (true) with
 create policy "anon full access" on considerations for all using (true) with check (true);
 create policy "anon full access" on consideration_affected for all using (true) with check (true);
 create policy "anon full access" on github_repos for all using (true) with check (true);
+create policy "anon full access" on deep_test_items for all using (true) with check (true);
+create policy "anon full access" on deep_test_runs for all using (true) with check (true);
+create policy "anon full access" on tech_stack_items for all using (true) with check (true);

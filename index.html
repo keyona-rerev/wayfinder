@@ -46,9 +46,9 @@
   .kanban-col{width:260px;flex-shrink:0;}
   .kanban-col h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;display:flex;align-items:center;gap:8px;margin:0 0 12px 4px;color:var(--body);opacity:.8;}
   .kanban-col .dot{width:7px;height:7px;border-radius:50%;}
-  .kc-active .dot{background:var(--cyan);}
   .kc-building .dot{background:var(--purple);}
-  .kc-stable .dot{background:#4D9D6F;}
+  .kc-live .dot{background:#4D9D6F;}
+  .kc-parked .dot{background:var(--cyan);}
   .kc-blocked .dot{background:var(--signal-spiral);}
 
   /* ---------- Cards (shared) ---------- */
@@ -70,9 +70,9 @@
   .list-table tr.row:hover{background:#F6FBFB;cursor:pointer;}
   .list-table .pname{font-weight:600;color:var(--primary);}
   .status-chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;}
-  .status-chip.Active{background:#E6F6F6;color:var(--cyan);}
   .status-chip.Building{background:#F1EAFC;color:var(--purple);}
-  .status-chip.Stable{background:#E7F5EE;color:#2E7D52;}
+  .status-chip.Live{background:#E7F5EE;color:#2E7D52;}
+  .status-chip.Parked{background:#E6F6F6;color:var(--cyan);}
   .status-chip.Blocked{background:#FCEAE8;color:var(--signal-spiral);}
 
   /* ---------- Grid ---------- */
@@ -362,8 +362,8 @@ async function fetchProjects(){
   }));
 }
 
-const statusOrder = ['Active','Building','Stable','Blocked'];
-const statusClass = {Active:'kc-active',Building:'kc-building',Stable:'kc-stable',Blocked:'kc-blocked'};
+const statusOrder = ['Building','Live','Parked','Blocked'];
+const statusClass = {Building:'kc-building',Live:'kc-live',Parked:'kc-parked',Blocked:'kc-blocked'};
 
 const GROUP_PALETTE = ['#1A9E9E','#7C3AED','#E0A93D','#4D9D6F','#E0635A','#3457C9','#B23B72','#8FA6B0'];
 const groupColorCache = {};
@@ -524,7 +524,7 @@ function renderKanban(){
   const el = document.getElementById('view-kanban');
   el.innerHTML = statusOrder.map(s=>{
     const items = projects.filter(p=>p.status===s);
-    return `<div class="kanban-col">
+    return `<div class="kanban-col ${statusClass[s]}">
       <h3><span class="dot"></span>${s} (${items.length})</h3>
       ${items.map(p=>cardHTML(p)).join('')}
     </div>`;
