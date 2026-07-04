@@ -195,6 +195,23 @@
   .fnode.considering circle{stroke:#E0A93D;stroke-width:2.5;animation:pulseAmberReal 1.6s ease-in-out infinite;}
   @keyframes pulsePurpleReal{0%,100%{filter:drop-shadow(0 0 0px rgba(124,58,237,0));}50%{filter:drop-shadow(0 0 6px rgba(124,58,237,.95));}}
   .fnode.source circle{fill:#7C3AED;stroke:#7C3AED;animation:pulsePurpleReal 1.6s ease-in-out infinite;}
+
+  /* ---------- Unmapped GitHub repos ---------- */
+  .unmapped-section{margin-top:24px;}
+  .unmapped-toggle{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-family:'Inter';font-size:13px;font-weight:600;color:var(--body);cursor:pointer;width:100%;text-align:left;}
+  .unmapped-toggle:hover{border-color:var(--cyan);color:var(--cyan);}
+  .unmapped-panel{margin-top:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:6px 14px;max-height:420px;overflow:auto;}
+  .unmapped-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 4px;border-bottom:1px solid var(--border);}
+  .unmapped-row:last-child{border-bottom:none;}
+  .unmapped-row-main{min-width:0;flex:1;}
+  .unmapped-row-name{font-size:13px;font-weight:600;color:var(--primary);}
+  .unmapped-row-name a{color:inherit;text-decoration:none;}
+  .unmapped-row-name a:hover{text-decoration:underline;}
+  .unmapped-row-desc{font-size:11.5px;opacity:.7;margin-top:2px;}
+  .unmapped-row-meta{font-size:10.5px;opacity:.6;margin-top:3px;display:flex;gap:8px;}
+  .unmapped-add-btn{background:var(--cyan);color:#fff;border:none;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;cursor:pointer;flex-shrink:0;}
+  .unmapped-add-btn:hover{opacity:.9;}
+  .unmapped-add-btn:disabled{opacity:.5;cursor:default;}
 </style>
 </head>
 <body>
@@ -235,6 +252,14 @@
         <div id="view-grid" class="grid-wrap" style="display:none;"></div>
         <!-- GALLERY -->
         <div id="view-gallery" class="gallery-wrap" style="display:none;"></div>
+      </div>
+
+      <!-- ===== Unmapped GitHub repos ===== -->
+      <div class="unmapped-section">
+        <button class="unmapped-toggle" onclick="toggleUnmappedRepos()"><span id="unmappedToggleLabel">Show unmapped GitHub repos</span></button>
+        <div id="unmappedReposPanel" class="unmapped-panel" style="display:none;">
+          <div id="unmappedReposList"></div>
+        </div>
       </div>
     </div>
 
@@ -319,7 +344,7 @@ async function fetchProjects(){
   return rows.map(row => ({
     id: row.id, name: row.name, venture: row.venture, status: row.status,
     signal: row.signal, lastSignal: row.last_signal, lastActivity: row.last_activity,
-    goal: row.goal, map: row.map_type,
+    goal: row.goal, map: row.map_type, repoFullName: row.repo_full_name,
     rubric: (row.rubric_lenses || []).map(r => ({n: r.name, d: r.description})),
     diary: (row.diary_entries || []).map(d => ({date: d.entry_date, sig: d.signal, source: d.source, kind: d.kind, author: d.author, text: d.body})),
     sessionLog: (row.session_log_entries || []).map(s => ({label: s.session_label, url: s.session_url, bullets: s.bullets})),
@@ -926,12 +951,89 @@ async function addDiaryEntry(pid){
   });
 }
 
+let githubRepos = [];
+
+async function fetchGithubRepos(){
+  const res = await fetch(`${REST}/github_repos?select=full_name,name,owner,description,private,language,html_url,pushed_at&order=pushed_at.desc`, {headers: restHeaders});
+  return res.json();
+}
+
+function toggleUnmappedRepos(){
+  const panel = document.getElementById('unmappedReposPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function renderUnmappedRepos(){
+  const mapped = new Set(projects.filter(p => p.repoFullName).map(p => p.repoFullName));
+  const unmapped = githubRepos.filter(r => !mapped.has(r.full_name));
+  document.getElementById('unmappedToggleLabel').textContent = `Show unmapped GitHub repos (${unmapped.length})`;
+  const list = document.getElementById('unmappedReposList');
+  if(!unmapped.length){
+    list.innerHTML = `<div class="empty-note">Every synced repo is mapped to a project.</div>`;
+    return;
+  }
+  list.innerHTML = unmapped.map(r => `
+    <div class="unmapped-row" data-repo="${r.full_name}">
+      <div class="unmapped-row-main">
+        <div class="unmapped-row-name"><a href="${r.html_url}" target="_blank" rel="noopener">${r.name}</a></div>
+        ${r.description ? `<div class="unmapped-row-desc">${r.description}</div>` : ''}
+        <div class="unmapped-row-meta">${r.private ? 'Private' : 'Public'}${r.language ? ' · ' + r.language : ''}${r.pushed_at ? ' · pushed ' + new Date(r.pushed_at).toLocaleDateString() : ''}</div>
+      </div>
+      <button class="unmapped-add-btn" onclick="addRepoAsProject('${r.full_name}')">+ Add to Wayfinder</button>
+    </div>`).join('');
+}
+
+function slugify(s){
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'project';
+}
+function humanizeRepoName(name){
+  return name.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function addRepoAsProject(fullName){
+  const repo = githubRepos.find(r => r.full_name === fullName);
+  if(!repo) return;
+  const btn = document.querySelector(`.unmapped-row[data-repo="${fullName}"] .unmapped-add-btn`);
+  if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
+
+  let id = slugify(repo.name);
+  if(projects.some(p => p.id === id)) id = slugify(`${repo.owner}-${repo.name}`);
+
+  const lensNames = ['Functional outcome', 'Downstream surfaces', 'Structural integrity', 'UX efficacy'];
+  const newProjectRow = {
+    id, name: humanizeRepoName(repo.name), venture: 'Unassigned', status: 'Building',
+    signal: 'clean', last_signal: 'Resolved', last_activity: 'Just added',
+    goal: repo.description || '', map_type: 'tree', repo_full_name: fullName
+  };
+
+  await fetch(`${REST}/projects`, {
+    method: 'POST', headers: {...restHeaders, Prefer: 'return=minimal'},
+    body: JSON.stringify(newProjectRow)
+  });
+  await fetch(`${REST}/rubric_lenses`, {
+    method: 'POST', headers: {...restHeaders, Prefer: 'return=minimal'},
+    body: JSON.stringify(lensNames.map((n, i) => ({project_id: id, lens_order: i + 1, name: n, description: 'Not yet defined for this project.'})))
+  });
+
+  projects.push({
+    id, name: newProjectRow.name, venture: newProjectRow.venture, status: newProjectRow.status,
+    signal: newProjectRow.signal, lastSignal: newProjectRow.last_signal, lastActivity: newProjectRow.last_activity,
+    goal: newProjectRow.goal, map: newProjectRow.map_type, repoFullName: fullName,
+    rubric: lensNames.map(n => ({n, d: 'Not yet defined for this project.'})),
+    diary: [], sessionLog: [], rubricLog: []
+  });
+
+  renderKanban(); renderList(); renderGrid(); renderGallery();
+  renderUnmappedRepos();
+}
+
 async function init(){
-  projects = await fetchProjects();
+  [projects, githubRepos] = await Promise.all([fetchProjects(), fetchGithubRepos()]);
   renderKanban();
   renderList();
   renderGrid();
   renderGallery();
+  renderUnmappedRepos();
 }
 init();
 </script>

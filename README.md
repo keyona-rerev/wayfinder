@@ -14,6 +14,11 @@ Per-project dashboard tool. Five modules sit inside each project (Session Log, B
 - `supabase/schema.sql` — schema for `projects`, `rubric_lenses`, `diary_entries`, `session_log_entries`, `rubric_evolution_log`, `architecture_nodes`, `architecture_edges`, `architecture_snapshots`, `considerations`, and `consideration_affected` (RLS enabled, anon role granted full access since there's no auth layer).
 - `scripts/import_architecture_graph.py` — one-off/rerunnable importer: runs `code-review-graph build` against a cloned project repo, reads its local SQLite graph, and loads File nodes plus resolved `IMPORTS_FROM` edges into Supabase for that project.
 - `scripts/log_consideration.py` — computes the blast radius of a proposed change (BFS over the stored `IMPORTS_FROM` edges, reversed) and logs it as a Consideration for the dashboard to display.
+- `scripts/sync_github_repos.py` — syncs the full GitHub repo list into `github_repos`, so the Interface can show which repos aren't a Wayfinder project yet.
+
+## Unmapped GitHub repos
+
+Below the main board, a collapsible "unmapped GitHub repos" panel lists every synced repo (`github_repos`) that no `projects` row points to via `repo_full_name`. Clicking "+ Add to Wayfinder" on one creates a real `projects` row on the spot (id slugified from the repo name, goal pre-filled from the repo description if it has one, a default 4-lens rubric scaffold, `status: Building`, `venture: Unassigned`) so it shows up on the board immediately. This only creates the metadata shell — Architecture Map/Consideration Mode still need a deliberate follow-up run (`import_architecture_graph.py`, then `log_consideration.py`) against that repo, same as Knowledge Loom Prismm.
 
 ## Rubric
 

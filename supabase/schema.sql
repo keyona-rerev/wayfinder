@@ -1,6 +1,7 @@
 -- Wayfinder Supabase schema (project: ueosmjwumqqyswmnbyji)
 -- Applied via migrations: init_projects_schema, seed_initial_projects,
--- add_session_log_entries, add_rubric_evolution_log, add_architecture_map_tables.
+-- add_session_log_entries, add_rubric_evolution_log, add_architecture_map_tables,
+-- add_considerations, add_github_repos_and_project_linking.
 -- No custom backend: this is a static site calling PostgREST directly with
 -- the anon key, so RLS policies grant the anon role full access rather than
 -- gating on auth (single-user internal tool).
@@ -15,6 +16,7 @@ create table projects (
   last_activity text not null,
   goal text not null default '',
   map_type text not null default 'tree' check (map_type in ('tree','graph')),
+  repo_full_name text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -93,6 +95,37 @@ create table architecture_edges (
 create index architecture_nodes_project_idx on architecture_nodes(project_id);
 create index architecture_edges_project_idx on architecture_edges(project_id);
 
+create table considerations (
+  id text primary key,
+  project_id text not null references projects(id) on delete cascade,
+  label text not null,
+  source_qualified text not null,
+  created_at timestamptz not null default now()
+);
+
+create table consideration_affected (
+  id bigserial primary key,
+  consideration_id text not null references considerations(id) on delete cascade,
+  target_qualified text not null,
+  note text not null default '',
+  depth int not null default 1
+);
+
+create index consideration_affected_consideration_idx on consideration_affected(consideration_id);
+
+create table github_repos (
+  full_name text primary key,
+  name text not null,
+  owner text not null,
+  description text,
+  private boolean not null default false,
+  language text,
+  html_url text not null,
+  default_branch text not null default 'main',
+  pushed_at timestamptz,
+  synced_at timestamptz not null default now()
+);
+
 alter table projects enable row level security;
 alter table rubric_lenses enable row level security;
 alter table diary_entries enable row level security;
@@ -101,6 +134,9 @@ alter table rubric_evolution_log enable row level security;
 alter table architecture_snapshots enable row level security;
 alter table architecture_nodes enable row level security;
 alter table architecture_edges enable row level security;
+alter table considerations enable row level security;
+alter table consideration_affected enable row level security;
+alter table github_repos enable row level security;
 
 create policy "anon full access" on projects for all using (true) with check (true);
 create policy "anon full access" on rubric_lenses for all using (true) with check (true);
@@ -110,3 +146,6 @@ create policy "anon full access" on rubric_evolution_log for all using (true) wi
 create policy "anon full access" on architecture_snapshots for all using (true) with check (true);
 create policy "anon full access" on architecture_nodes for all using (true) with check (true);
 create policy "anon full access" on architecture_edges for all using (true) with check (true);
+create policy "anon full access" on considerations for all using (true) with check (true);
+create policy "anon full access" on consideration_affected for all using (true) with check (true);
+create policy "anon full access" on github_repos for all using (true) with check (true);
