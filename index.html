@@ -210,9 +210,18 @@
   .unmapped-add-btn:hover{opacity:.9;}
   .unmapped-add-btn:disabled{opacity:.5;cursor:default;}
 
-  .analysis-pending-pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FBF1DD;color:#A47620;margin-top:6px;}
-  .pending-banner{background:#FBF1DD;border:1px solid #E0A93D;border-radius:10px;padding:12px 15px;margin-bottom:18px;font-size:12.5px;line-height:1.6;color:var(--primary);}
-  .pending-banner strong{color:#A47620;}
+  .analysis-pending-pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:6px;}
+
+  .analysis-stepper{background:#F6FBFB;border:1px solid var(--border);border-radius:10px;padding:12px 15px;margin-bottom:18px;}
+  .analysis-stepper-bar{display:flex;gap:4px;height:8px;margin-bottom:6px;}
+  .analysis-stepper-seg{flex:1;background:var(--border);border-radius:4px;transition:background .3s;}
+  .analysis-stepper-seg.done{background:#4D9D6F;}
+  @keyframes pulseSeg{0%,100%{opacity:.55;}50%{opacity:1;}}
+  .analysis-stepper-seg.active{background:#1A9E9E;animation:pulseSeg 1.4s ease-in-out infinite;}
+  .analysis-stepper-seg.failed{background:var(--signal-spiral);}
+  .analysis-stepper-labels{display:flex;justify-content:space-between;font-size:10px;opacity:.6;margin-bottom:8px;}
+  .analysis-stepper-status{font-size:12.5px;line-height:1.6;color:var(--primary);}
+  .analysis-stepper-status.error{color:var(--signal-spiral);}
 </style>
 </head>
 <body>
@@ -345,6 +354,7 @@ async function fetchProjects(){
     signal: row.signal, lastSignal: row.last_signal, lastActivity: row.last_activity,
     goal: row.goal, map: row.map_type, repoFullName: row.repo_full_name,
     hasArchitectureMap: !!(row.architecture_snapshots && row.architecture_snapshots.length),
+    analysisStatus: row.analysis_status, analysisStartedAt: row.analysis_started_at, analysisError: row.analysis_error,
     rubric: (row.rubric_lenses || []).map(r => ({n: r.name, d: r.description})),
     diary: (row.diary_entries || []).map(d => ({date: d.entry_date, sig: d.signal, source: d.source, kind: d.kind, author: d.author, text: d.body})),
     sessionLog: (row.session_log_entries || []).map(s => ({label: s.session_label, url: s.session_url, bullets: s.bullets})),
@@ -521,13 +531,62 @@ function renderKanban(){
   }).join('');
   el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
 }
+function elapsedText(isoString){
+  if(!isoString) return '';
+  const sec = Math.max(0, Math.floor((Date.now() - new Date(isoString).getTime()) / 1000));
+  if(sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if(min < 60) return `${min}m ${sec % 60}s`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h ${min % 60}m`;
+}
+
+function showsAnalysisStatus(p){
+  return p.repoFullName && p.analysisStatus && p.analysisStatus !== 'complete' && p.analysisStatus !== 'not_requested';
+}
+
+function analysisPillHTML(p){
+  if(!showsAnalysisStatus(p)) return '';
+  const styles = {
+    queued: ['Queued for analysis', '#A47620', '#FBF1DD'],
+    running: ['Analyzing…', '#1A9E9E', '#E6F6F6'],
+    failed: ['Analysis failed', '#C0392B', '#FCEAE8']
+  };
+  const [label, color, bg] = styles[p.analysisStatus] || ['Pending', '#A47620', '#FBF1DD'];
+  return `<div class="analysis-pending-pill" style="color:${color};background:${bg};">${label}</div>`;
+}
+
+function analysisStepperHTML(p){
+  if(p.analysisStatus === 'failed'){
+    return `<div class="analysis-stepper">
+      <div class="analysis-stepper-bar"><div class="analysis-stepper-seg failed"></div><div class="analysis-stepper-seg failed"></div><div class="analysis-stepper-seg failed"></div></div>
+      <div class="analysis-stepper-labels"><span>Queued</span><span>Running</span><span>Failed</span></div>
+      <div class="analysis-stepper-status error"><strong>Analysis failed.</strong> ${p.analysisError || 'No error detail recorded.'} Ask Claude to retry it next session.</div>
+    </div>`;
+  }
+  const stageIdx = {queued: 0, running: 1}[p.analysisStatus] ?? 0;
+  const segs = [0, 1, 2].map(i => {
+    let cls = 'analysis-stepper-seg';
+    if(i < stageIdx) cls += ' done';
+    else if(i === stageIdx) cls += ' active';
+    return `<div class="${cls}"></div>`;
+  }).join('');
+  const statusText = p.analysisStatus === 'running'
+    ? `Analyzing <code>${p.repoFullName}</code> — running for ${elapsedText(p.analysisStartedAt)}. This clones the repo and runs code-review-graph against it; no fixed ETA, but small/medium repos have taken well under a minute so far.`
+    : `Linked to <code>${p.repoFullName}</code>, queued for analysis${p.analysisStartedAt ? ` (${elapsedText(p.analysisStartedAt)} ago)` : ''}. No fixed ETA — this starts the next time a Claude session works on this project, not automatically from the dashboard.`;
+  return `<div class="analysis-stepper">
+    <div class="analysis-stepper-bar">${segs}</div>
+    <div class="analysis-stepper-labels"><span>Queued</span><span>Running</span><span>Complete</span></div>
+    <div class="analysis-stepper-status">${statusText}</div>
+  </div>`;
+}
+
 function cardHTML(p){
-  const pending = p.repoFullName && !p.hasArchitectureMap;
   return `<div class="pcard" data-pid="${p.id}">
     <div class="venture">${p.venture}</div>
     <h4>${p.name}</h4>
     <div class="meta">${signalPillHTML(p.signal)}<span>${p.lastActivity}</span></div>
-    ${pending ? `<div class="analysis-pending-pill">Analysis pending</div>` : ''}
+    ${analysisPillHTML(p)}
   </div>`;
 }
 
@@ -536,7 +595,7 @@ function renderList(){
   const tbody = document.querySelector('#view-list tbody');
   tbody.innerHTML = projects.map(p=>`
     <tr class="row" data-pid="${p.id}">
-      <td class="pname">${p.name}${p.repoFullName && !p.hasArchitectureMap ? ` <span class="analysis-pending-pill">Analysis pending</span>` : ''}</td>
+      <td class="pname">${p.name}${showsAnalysisStatus(p) ? ` ${analysisPillHTML(p)}` : ''}</td>
       <td>${p.venture}</td>
       <td><span class="status-chip ${p.status}">${p.status}</span></td>
       <td>${signalPillHTML(p.signal)}</td>
@@ -738,6 +797,54 @@ function mapCanvasHTML(p){
 // ---- State ----
 let currentProjectId = null;
 let currentPanelView = null; // null | 'rubric' | 'diary' | 'map'
+let statusPollInterval = null;
+let elapsedTickInterval = null;
+let pollingProjectId = null;
+
+function renderAnalysisBanner(pid){
+  const p = projects.find(x => x.id === pid);
+  if(!p) return;
+  document.getElementById('analysisPendingBanner').innerHTML = showsAnalysisStatus(p) ? analysisStepperHTML(p) : '';
+}
+
+function stopStatusPolling(){
+  if(statusPollInterval) clearInterval(statusPollInterval);
+  if(elapsedTickInterval) clearInterval(elapsedTickInterval);
+  statusPollInterval = null;
+  elapsedTickInterval = null;
+  pollingProjectId = null;
+}
+
+async function fetchProjectStatus(pid){
+  const res = await fetch(`${REST}/projects?id=eq.${pid}&select=analysis_status,analysis_started_at,analysis_error,architecture_snapshots(generated_at)`, {headers: restHeaders});
+  const rows = await res.json();
+  return rows[0];
+}
+
+function startStatusPollingIfNeeded(pid){
+  stopStatusPolling();
+  const p = projects.find(x => x.id === pid);
+  if(!p || p.analysisStatus !== 'queued' && p.analysisStatus !== 'running') return;
+  pollingProjectId = pid;
+
+  elapsedTickInterval = setInterval(() => {
+    if(currentProjectId === pollingProjectId) renderAnalysisBanner(pollingProjectId);
+  }, 1000);
+
+  statusPollInterval = setInterval(async () => {
+    const row = await fetchProjectStatus(pid);
+    if(!row) return;
+    const proj = projects.find(x => x.id === pid);
+    if(!proj) return;
+    proj.analysisStatus = row.analysis_status;
+    proj.analysisStartedAt = row.analysis_started_at;
+    proj.analysisError = row.analysis_error;
+    proj.hasArchitectureMap = !!(row.architecture_snapshots && row.architecture_snapshots.length);
+    if(currentProjectId === pollingProjectId) renderAnalysisBanner(pollingProjectId);
+    renderKanban(); renderList(); renderGrid(); renderGallery();
+    if(proj.analysisStatus === 'complete' || proj.analysisStatus === 'failed') stopStatusPolling();
+  }, 5000);
+}
 
 function openDetail(pid){
   currentProjectId = pid;
@@ -752,9 +859,8 @@ function openDetail(pid){
   statusEl.textContent = p.status;
   statusEl.className = 'status-chip ' + p.status;
 
-  document.getElementById('analysisPendingBanner').innerHTML = (p.repoFullName && !p.hasArchitectureMap)
-    ? `<div class="pending-banner"><strong>Analysis pending.</strong> This project is linked to <code>${p.repoFullName}</code> but no Architecture Map has been generated yet. That requires a Claude session to clone the repo and run code-review-graph against it — it doesn't happen automatically from the dashboard. Ask Claude to process it next session.</div>`
-    : '';
+  renderAnalysisBanner(pid);
+  startStatusPollingIfNeeded(pid);
   document.getElementById('sessionLogBody').innerHTML = sessionLogTableHTML(p);
   document.getElementById('rubricBody').innerHTML = rubricBodyHTML(p, false);
   document.getElementById('diaryBody').innerHTML = diaryListHTML(p);
@@ -796,6 +902,7 @@ function backToOverview(){
 }
 
 function closeDetail(){
+  stopStatusPolling();
   renderKanban(); renderList(); renderGrid(); renderGallery();
   document.getElementById('boardWrap').classList.remove('hidden');
   document.getElementById('detailView').classList.remove('open');
@@ -895,7 +1002,7 @@ async function addRepoAsProject(fullName){
   const newProjectRow = {
     id, name: humanizeRepoName(repo.name), venture: 'Unassigned', status: 'Building',
     signal: 'clean', last_signal: 'Resolved', last_activity: 'Just added',
-    goal: repo.description || '', map_type: 'tree', repo_full_name: fullName
+    goal: repo.description || '', map_type: 'tree', repo_full_name: fullName, analysis_status: 'queued'
   };
 
   await fetch(`${REST}/projects`, {
@@ -911,6 +1018,7 @@ async function addRepoAsProject(fullName){
     id, name: newProjectRow.name, venture: newProjectRow.venture, status: newProjectRow.status,
     signal: newProjectRow.signal, lastSignal: newProjectRow.last_signal, lastActivity: newProjectRow.last_activity,
     goal: newProjectRow.goal, map: newProjectRow.map_type, repoFullName: fullName, hasArchitectureMap: false,
+    analysisStatus: 'queued', analysisStartedAt: null, analysisError: null,
     rubric: lensNames.map(n => ({n, d: 'Not yet defined for this project.'})),
     diary: [], sessionLog: [], rubricLog: []
   });

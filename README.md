@@ -18,7 +18,11 @@ Per-project dashboard tool. Five modules sit inside each project (Session Log, B
 
 ## Unmapped GitHub repos
 
-Below the main board, a collapsible "unmapped GitHub repos" panel lists every synced repo (`github_repos`) that no `projects` row points to via `repo_full_name`. Clicking "+ Add to Wayfinder" on one creates a real `projects` row on the spot (id slugified from the repo name, goal pre-filled from the repo description if it has one, a default 4-lens rubric scaffold, `status: Building`, `venture: Unassigned`) so it shows up on the board immediately. This only creates the metadata shell — Architecture Map/Consideration Mode still need a deliberate follow-up run (`import_architecture_graph.py`, then `log_consideration.py`) against that repo, same as Knowledge Loom Prismm.
+Below the main board, a collapsible "unmapped GitHub repos" panel lists every synced repo (`github_repos`) that no `projects` row points to via `repo_full_name`. Clicking "+ Add to Wayfinder" on one creates a real `projects` row on the spot (id slugified from the repo name, goal pre-filled from the repo description if it has one, a default 4-lens rubric scaffold, `status: Building`, `venture: Unassigned`, `analysis_status: queued`) so it shows up on the board immediately. This only creates the metadata shell — Architecture Map/Consideration Mode still need a deliberate follow-up run (`import_architecture_graph.py`, then `log_consideration.py`) against that repo, same as Knowledge Loom Prismm.
+
+### Analysis status
+
+Since there's no custom backend, a dashboard click can never itself clone a repo and run the analysis — that only happens when a Claude session runs `import_architecture_graph.py`. Rather than a flat "pending" label, `projects.analysis_status` tracks real stages (`queued` → `running` → `complete`/`failed`), written by the script itself as it goes (`analysis_started_at` set when it starts). The dashboard shows this as a 3-segment stepper bar on the project's detail page — with an elapsed-time readout instead of a fabricated ETA, since actual duration depends on repo size and, for `queued`, on when a session next picks it up — plus a compact status pill on every board view. While a project's detail page is open with `queued`/`running` status, the dashboard polls Supabase every 5s and ticks the elapsed timer every 1s, so a run in progress is visible live; polling stops once status reaches `complete` or `failed`.
 
 ## Rubric
 

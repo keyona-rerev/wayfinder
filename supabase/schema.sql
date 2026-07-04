@@ -1,7 +1,7 @@
 -- Wayfinder Supabase schema (project: ueosmjwumqqyswmnbyji)
 -- Applied via migrations: init_projects_schema, seed_initial_projects,
 -- add_session_log_entries, add_rubric_evolution_log, add_architecture_map_tables,
--- add_considerations, add_github_repos_and_project_linking.
+-- add_considerations, add_github_repos_and_project_linking, add_analysis_status_tracking.
 -- No custom backend: this is a static site calling PostgREST directly with
 -- the anon key, so RLS policies grant the anon role full access rather than
 -- gating on auth (single-user internal tool).
@@ -17,6 +17,9 @@ create table projects (
   goal text not null default '',
   map_type text not null default 'tree' check (map_type in ('tree','graph')),
   repo_full_name text,
+  analysis_status text not null default 'not_requested' check (analysis_status in ('not_requested','queued','running','complete','failed')),
+  analysis_started_at timestamptz,
+  analysis_error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

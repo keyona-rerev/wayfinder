@@ -1,23 +1,31 @@
 #!/usr/bin/env python3
-"""Import a code-review-graph SQLite graph into Wayfinder's Supabase tables.
+"""Run code-review-graph and import its output into Wayfinder's Supabase tables.
 
 Usage:
     pip install code-review-graph
-    cd /path/to/target-repo && code-review-graph build
     python3 scripts/import_architecture_graph.py --repo /path/to/target-repo --project-id knowledge-loom
 
-Only File/Function/Class nodes and resolved IMPORTS_FROM edges are imported.
-Raw CALLS edges mostly resolve to unqualified names (React/hooks/npm calls),
-not a specific file+function, so they're intentionally left out rather than
-building a fallback resolver for them. Re-running this script fully replaces
-the prior graph for the given project id.
+Runs `code-review-graph build` against the repo (unless --skip-build is
+passed, e.g. if you already ran it), then reads the resulting SQLite graph
+and imports File/Function/Class nodes plus resolved IMPORTS_FROM edges.
+Raw CALLS edges mostly resolve to unqualified names (React/hooks/npm
+calls), not a specific file+function, so they're intentionally left out
+rather than building a fallback resolver for them.
+
+Writes projects.analysis_status ('running' -> 'complete'/'failed') as it
+goes, with analysis_started_at set at the start, so the dashboard can show
+real stage progress instead of a flat "pending" label. Re-running this
+fully replaces the prior graph for the given project id.
 """
 import argparse
 import json
 import re
 import sqlite3
+import subprocess
+import sys
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -43,6 +51,13 @@ def rest_request(base_url, key, method, path, body=None, extra_headers=None):
         return resp.read()
 
 
+def set_status(base_url, key, project_id, **fields):
+    rest_request(
+        base_url, key, "PATCH", f"projects?id=eq.{project_id}",
+        fields, extra_headers={"Prefer": "return=minimal"},
+    )
+
+
 def normalize(value, repo_root):
     prefix = repo_root.rstrip("/") + "/"
     return value[len(prefix):] if value.startswith(prefix) else value
@@ -50,64 +65,79 @@ def normalize(value, repo_root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--repo", required=True, help="Path to the cloned target repo (must already have run `code-review-graph build`)")
+    parser.add_argument("--repo", required=True, help="Path to the cloned target repo")
     parser.add_argument("--project-id", required=True, help="Wayfinder project id (matches projects.id)")
     parser.add_argument("--batch-size", type=int, default=200)
+    parser.add_argument("--skip-build", action="store_true", help="Skip `code-review-graph build`, reuse an existing .code-review-graph/graph.db")
     args = parser.parse_args()
 
     repo_root = str(Path(args.repo).resolve())
-    db_path = Path(repo_root) / ".code-review-graph" / "graph.db"
-    if not db_path.exists():
-        raise SystemExit(f"No graph.db found at {db_path}. Run `code-review-graph build` in {repo_root} first.")
-
     supabase_url, supabase_key = load_config()
 
-    con = sqlite3.connect(str(db_path))
-    cur = con.cursor()
-    cur.execute("select kind, name, qualified_name, file_path, line_start, line_end, language, parent_name from nodes")
-    raw_nodes = cur.fetchall()
-    cur.execute("select source_qualified, target_qualified, file_path, line from edges where kind='IMPORTS_FROM'")
-    raw_edges = cur.fetchall()
-
-    node_rows = []
-    qnames = set()
-    for kind, name, qn, fp, line_start, line_end, language, parent_name in raw_nodes:
-        nqn = normalize(qn, repo_root)
-        nname = normalize(name, repo_root) if kind == "File" else name
-        nfp = normalize(fp, repo_root)
-        qnames.add(nqn)
-        node_rows.append({
-            "project_id": args.project_id, "kind": kind, "name": nname, "qualified_name": nqn,
-            "file_path": nfp, "line_start": line_start, "line_end": line_end,
-            "language": language, "parent_name": parent_name,
-        })
-
-    edge_rows = []
-    for sq, tq, fp, line in raw_edges:
-        nsq, ntq, nfp = normalize(sq, repo_root), normalize(tq, repo_root), normalize(fp, repo_root)
-        edge_rows.append({
-            "project_id": args.project_id, "kind": "IMPORTS_FROM", "source_qualified": nsq,
-            "target_qualified": ntq, "file_path": nfp, "line": line, "resolved": ntq in qnames,
-        })
-
-    files_parsed = sum(1 for n in node_rows if n["kind"] == "File")
-
-    # Full replace for this project on every run.
-    rest_request(supabase_url, supabase_key, "DELETE", f"architecture_nodes?project_id=eq.{args.project_id}")
-    rest_request(supabase_url, supabase_key, "DELETE", f"architecture_edges?project_id=eq.{args.project_id}")
-
-    for i in range(0, len(node_rows), args.batch_size):
-        rest_request(supabase_url, supabase_key, "POST", "architecture_nodes", node_rows[i:i + args.batch_size])
-    for i in range(0, len(edge_rows), args.batch_size):
-        rest_request(supabase_url, supabase_key, "POST", "architecture_edges", edge_rows[i:i + args.batch_size])
-
-    rest_request(
-        supabase_url, supabase_key, "POST", "architecture_snapshots",
-        {"project_id": args.project_id, "files_parsed": files_parsed, "node_count": len(node_rows), "edge_count": len(edge_rows)},
-        extra_headers={"Prefer": "resolution=merge-duplicates"},
+    set_status(
+        supabase_url, supabase_key, args.project_id,
+        analysis_status="running", analysis_started_at=datetime.now(timezone.utc).isoformat(), analysis_error=None,
     )
 
-    print(f"Imported {len(node_rows)} nodes, {len(edge_rows)} edges ({files_parsed} files) for project '{args.project_id}'.")
+    try:
+        if not args.skip_build:
+            subprocess.run(["code-review-graph", "build", "--repo", repo_root], check=True)
+
+        db_path = Path(repo_root) / ".code-review-graph" / "graph.db"
+        if not db_path.exists():
+            raise SystemExit(f"No graph.db found at {db_path}. Run `code-review-graph build` in {repo_root} first.")
+
+        con = sqlite3.connect(str(db_path))
+        cur = con.cursor()
+        cur.execute("select kind, name, qualified_name, file_path, line_start, line_end, language, parent_name from nodes")
+        raw_nodes = cur.fetchall()
+        cur.execute("select source_qualified, target_qualified, file_path, line from edges where kind='IMPORTS_FROM'")
+        raw_edges = cur.fetchall()
+
+        node_rows = []
+        qnames = set()
+        for kind, name, qn, fp, line_start, line_end, language, parent_name in raw_nodes:
+            nqn = normalize(qn, repo_root)
+            nname = normalize(name, repo_root) if kind == "File" else name
+            nfp = normalize(fp, repo_root)
+            qnames.add(nqn)
+            node_rows.append({
+                "project_id": args.project_id, "kind": kind, "name": nname, "qualified_name": nqn,
+                "file_path": nfp, "line_start": line_start, "line_end": line_end,
+                "language": language, "parent_name": parent_name,
+            })
+
+        edge_rows = []
+        for sq, tq, fp, line in raw_edges:
+            nsq, ntq, nfp = normalize(sq, repo_root), normalize(tq, repo_root), normalize(fp, repo_root)
+            edge_rows.append({
+                "project_id": args.project_id, "kind": "IMPORTS_FROM", "source_qualified": nsq,
+                "target_qualified": ntq, "file_path": nfp, "line": line, "resolved": ntq in qnames,
+            })
+
+        files_parsed = sum(1 for n in node_rows if n["kind"] == "File")
+
+        # Full replace for this project on every run.
+        rest_request(supabase_url, supabase_key, "DELETE", f"architecture_nodes?project_id=eq.{args.project_id}")
+        rest_request(supabase_url, supabase_key, "DELETE", f"architecture_edges?project_id=eq.{args.project_id}")
+
+        for i in range(0, len(node_rows), args.batch_size):
+            rest_request(supabase_url, supabase_key, "POST", "architecture_nodes", node_rows[i:i + args.batch_size])
+        for i in range(0, len(edge_rows), args.batch_size):
+            rest_request(supabase_url, supabase_key, "POST", "architecture_edges", edge_rows[i:i + args.batch_size])
+
+        rest_request(
+            supabase_url, supabase_key, "POST", "architecture_snapshots",
+            {"project_id": args.project_id, "files_parsed": files_parsed, "node_count": len(node_rows), "edge_count": len(edge_rows)},
+            extra_headers={"Prefer": "resolution=merge-duplicates"},
+        )
+
+        set_status(supabase_url, supabase_key, args.project_id, analysis_status="complete")
+        print(f"Imported {len(node_rows)} nodes, {len(edge_rows)} edges ({files_parsed} files) for project '{args.project_id}'.")
+    except Exception as e:
+        set_status(supabase_url, supabase_key, args.project_id, analysis_status="failed", analysis_error=str(e)[:500])
+        print(f"FAILED: {e}", file=sys.stderr)
+        raise
 
 
 if __name__ == "__main__":
