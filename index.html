@@ -28,9 +28,6 @@
   .shell{display:flex;min-height:100vh;}
   .rail{width:64px;background:var(--primary);display:flex;flex-direction:column;align-items:center;padding:20px 0;gap:28px;flex-shrink:0;}
   .rail .logo{width:32px;height:32px;border-radius:8px;background:var(--gradient);}
-  .rail .icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#9DB6C2;font-size:15px;cursor:pointer;transition:.15s;}
-  .rail .icon.active{background:rgba(255,255,255,.08);color:#fff;}
-  .rail .icon:hover{color:#fff;}
 
   .main{flex:1;display:flex;flex-direction:column;min-width:0;}
 
@@ -212,6 +209,10 @@
   .unmapped-add-btn{background:var(--cyan);color:#fff;border:none;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;cursor:pointer;flex-shrink:0;}
   .unmapped-add-btn:hover{opacity:.9;}
   .unmapped-add-btn:disabled{opacity:.5;cursor:default;}
+
+  .analysis-pending-pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FBF1DD;color:#A47620;margin-top:6px;}
+  .pending-banner{background:#FBF1DD;border:1px solid #E0A93D;border-radius:10px;padding:12px 15px;margin-bottom:18px;font-size:12.5px;line-height:1.6;color:var(--primary);}
+  .pending-banner strong{color:#A47620;}
 </style>
 </head>
 <body>
@@ -219,9 +220,6 @@
 <div class="shell">
   <div class="rail">
     <div class="logo"></div>
-    <div class="icon active">▦</div>
-    <div class="icon">✓</div>
-    <div class="icon">⚙</div>
   </div>
 
   <div class="main">
@@ -270,6 +268,7 @@
         <h2 id="detailTitle"></h2>
         <span class="status-chip" id="detailStatus"></span>
       </div>
+      <div id="analysisPendingBanner"></div>
 
       <div class="panels" id="panelsOverview">
         <!-- SESSION LOG -->
@@ -337,7 +336,7 @@ const restHeaders = {
 let projects = [];
 
 async function fetchProjects(){
-  const query = `select=*,rubric_lenses(name,description,lens_order),diary_entries(id,entry_date,signal,source,kind,author,body),session_log_entries(id,session_label,session_url,bullets),rubric_evolution_log(id,lens_name,old_description,new_description,changed_at)`
+  const query = `select=*,rubric_lenses(name,description,lens_order),diary_entries(id,entry_date,signal,source,kind,author,body),session_log_entries(id,session_label,session_url,bullets),rubric_evolution_log(id,lens_name,old_description,new_description,changed_at),architecture_snapshots(generated_at)`
     + `&rubric_lenses.order=lens_order.asc&diary_entries.order=id.desc&session_log_entries.order=id.desc&rubric_evolution_log.order=id.desc`;
   const res = await fetch(`${REST}/projects?${query}`, {headers: restHeaders});
   const rows = await res.json();
@@ -345,6 +344,7 @@ async function fetchProjects(){
     id: row.id, name: row.name, venture: row.venture, status: row.status,
     signal: row.signal, lastSignal: row.last_signal, lastActivity: row.last_activity,
     goal: row.goal, map: row.map_type, repoFullName: row.repo_full_name,
+    hasArchitectureMap: !!(row.architecture_snapshots && row.architecture_snapshots.length),
     rubric: (row.rubric_lenses || []).map(r => ({n: r.name, d: r.description})),
     diary: (row.diary_entries || []).map(d => ({date: d.entry_date, sig: d.signal, source: d.source, kind: d.kind, author: d.author, text: d.body})),
     sessionLog: (row.session_log_entries || []).map(s => ({label: s.session_label, url: s.session_url, bullets: s.bullets})),
@@ -634,10 +634,12 @@ function renderKanban(){
   el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
 }
 function cardHTML(p){
+  const pending = p.repoFullName && !p.hasArchitectureMap;
   return `<div class="pcard" data-pid="${p.id}">
     <div class="venture">${p.venture}</div>
     <h4>${p.name}</h4>
     <div class="meta">${signalPillHTML(p.signal)}<span>${p.lastActivity}</span></div>
+    ${pending ? `<div class="analysis-pending-pill">Analysis pending</div>` : ''}
   </div>`;
 }
 
@@ -646,7 +648,7 @@ function renderList(){
   const tbody = document.querySelector('#view-list tbody');
   tbody.innerHTML = projects.map(p=>`
     <tr class="row" data-pid="${p.id}">
-      <td class="pname">${p.name}</td>
+      <td class="pname">${p.name}${p.repoFullName && !p.hasArchitectureMap ? ` <span class="analysis-pending-pill">Analysis pending</span>` : ''}</td>
       <td>${p.venture}</td>
       <td><span class="status-chip ${p.status}">${p.status}</span></td>
       <td>${signalPillHTML(p.signal)}</td>
@@ -862,11 +864,14 @@ function openDetail(pid){
   statusEl.textContent = p.status;
   statusEl.className = 'status-chip ' + p.status;
 
+  document.getElementById('analysisPendingBanner').innerHTML = (p.repoFullName && !p.hasArchitectureMap)
+    ? `<div class="pending-banner"><strong>Analysis pending.</strong> This project is linked to <code>${p.repoFullName}</code> but no Architecture Map has been generated yet. That requires a Claude session to clone the repo and run code-review-graph against it — it doesn't happen automatically from the dashboard. Ask Claude to process it next session.</div>`
+    : '';
   document.getElementById('sessionLogBody').innerHTML = sessionLogTableHTML(p);
   document.getElementById('rubricBody').innerHTML = rubricBodyHTML(p, false);
   document.getElementById('diaryBody').innerHTML = diaryListHTML(p);
   document.getElementById('mapCanvas').innerHTML = mapCanvasHTML(p);
-  document.getElementById('mapFooter').textContent = 'Generated on demand · last run ' + p.lastActivity;
+  document.getElementById('mapFooter').textContent = p.hasArchitectureMap ? ('Generated on demand · last run ' + p.lastActivity) : 'Not yet generated for this project.';
 
   document.querySelector('.back-btn').textContent = '← All projects';
   document.querySelector('.back-btn').onclick = closeDetail;
@@ -1018,13 +1023,14 @@ async function addRepoAsProject(fullName){
   projects.push({
     id, name: newProjectRow.name, venture: newProjectRow.venture, status: newProjectRow.status,
     signal: newProjectRow.signal, lastSignal: newProjectRow.last_signal, lastActivity: newProjectRow.last_activity,
-    goal: newProjectRow.goal, map: newProjectRow.map_type, repoFullName: fullName,
+    goal: newProjectRow.goal, map: newProjectRow.map_type, repoFullName: fullName, hasArchitectureMap: false,
     rubric: lensNames.map(n => ({n, d: 'Not yet defined for this project.'})),
     diary: [], sessionLog: [], rubricLog: []
   });
 
   renderKanban(); renderList(); renderGrid(); renderGallery();
   renderUnmappedRepos();
+  openDetail(id);
 }
 
 async function init(){
