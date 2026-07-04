@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Wayfinder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F0F7F7;
+    --primary:#0D1F2D;
+    --body:#3D5166;
+    --cyan:#1A9E9E;
+    --purple:#7C3AED;
+    --gradient:linear-gradient(90deg,#1A9E9E,#7C3AED);
+    --card:#FFFFFF;
+    --border:#DCE7E7;
+    --signal-spiral:#E0635A;
+    --signal-friction:#E0A93D;
+    --signal-break:#1A9E9E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);font-family:'Inter',sans-serif;color:var(--body);}
+  h1,h2,h3,.display{font-family:'Outfit',sans-serif;color:var(--primary);}
+
+  /* ---------- Shell ---------- */
+  .shell{display:flex;min-height:100vh;}
+  .rail{width:64px;background:var(--primary);display:flex;flex-direction:column;align-items:center;padding:20px 0;gap:28px;flex-shrink:0;}
+  .rail .logo{width:32px;height:32px;border-radius:8px;background:var(--gradient);}
+  .rail .icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#9DB6C2;font-size:15px;cursor:pointer;transition:.15s;}
+  .rail .icon.active{background:rgba(255,255,255,.08);color:#fff;}
+  .rail .icon:hover{color:#fff;}
+
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:22px 32px 0;}
+  .topbar h1{font-size:22px;margin:0;font-weight:600;letter-spacing:-.01em;}
+  .topbar .sub{font-size:13px;color:var(--body);opacity:.75;margin-top:2px;}
+  .view-switch{display:flex;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px;}
+  .view-switch button{border:none;background:transparent;padding:7px 14px;font-family:'Inter';font-size:13px;font-weight:500;color:var(--body);border-radius:7px;cursor:pointer;transition:.15s;}
+  .view-switch button.active{background:var(--primary);color:#fff;}
+
+  .board-wrap{padding:22px 32px 40px;flex:1;overflow:auto;}
+
+  /* ---------- Kanban ---------- */
+  .kanban{display:flex;gap:18px;align-items:flex-start;}
+  .kanban-col{width:260px;flex-shrink:0;}
+  .kanban-col h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;display:flex;align-items:center;gap:8px;margin:0 0 12px 4px;color:var(--body);opacity:.8;}
+  .kanban-col .dot{width:7px;height:7px;border-radius:50%;}
+  .kc-active .dot{background:var(--cyan);}
+  .kc-building .dot{background:var(--purple);}
+  .kc-stable .dot{background:#4D9D6F;}
+  .kc-blocked .dot{background:var(--signal-spiral);}
+
+  /* ---------- Cards (shared) ---------- */
+  .pcard{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 14px 12px;margin-bottom:12px;cursor:pointer;transition:.15s;}
+  .pcard:hover{border-color:var(--cyan);transform:translateY(-1px);box-shadow:0 4px 14px rgba(13,31,45,.06);}
+  .pcard .venture{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--purple);margin-bottom:6px;}
+  .pcard h4{margin:0 0 8px;font-size:14.5px;font-weight:600;color:var(--primary);}
+  .pcard .meta{display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--body);opacity:.75;}
+  .signal-pill{font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;}
+  .signal-pill.spiral{background:#FCEAE8;color:var(--signal-spiral);}
+  .signal-pill.friction{background:#FBF1DD;color:#A47620;}
+  .signal-pill.clean{background:#E7F5EE;color:#2E7D52;}
+
+  /* ---------- List ---------- */
+  .list-table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .list-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--body);opacity:.7;font-weight:600;padding:12px 16px;border-bottom:1px solid var(--border);}
+  .list-table td{padding:13px 16px;border-bottom:1px solid var(--border);font-size:13.5px;}
+  .list-table tr:last-child td{border-bottom:none;}
+  .list-table tr.row:hover{background:#F6FBFB;cursor:pointer;}
+  .list-table .pname{font-weight:600;color:var(--primary);}
+  .status-chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;}
+  .status-chip.Active{background:#E6F6F6;color:var(--cyan);}
+  .status-chip.Building{background:#F1EAFC;color:var(--purple);}
+  .status-chip.Stable{background:#E7F5EE;color:#2E7D52;}
+  .status-chip.Blocked{background:#FCEAE8;color:var(--signal-spiral);}
+
+  /* ---------- Grid ---------- */
+  .grid-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;}
+
+  /* ---------- Gallery ---------- */
+  .gallery-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;}
+  .gcard{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:.15s;}
+  .gcard:hover{border-color:var(--cyan);box-shadow:0 6px 18px rgba(13,31,45,.08);}
+  .gcard .thumb{height:120px;background:var(--primary);position:relative;overflow:hidden;}
+  .gcard .thumb svg{width:100%;height:100%;}
+  .gcard .gbody{padding:14px 16px 16px;}
+
+  /* ---------- Detail view ---------- */
+  .detail{display:none;padding:22px 32px 40px;flex:1;overflow:auto;}
+  .detail.open{display:block;}
+  .board-wrap.hidden{display:none;}
+  .back-btn{background:none;border:none;color:var(--cyan);font-family:'Inter';font-size:13px;font-weight:600;cursor:pointer;margin-bottom:18px;padding:0;display:flex;align-items:center;gap:6px;}
+  .detail-head{display:flex;align-items:baseline;gap:14px;margin-bottom:22px;}
+  .detail-head h2{margin:0;font-size:24px;}
+  .panels{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;}
+  @media(max-width:1100px){.panels{grid-template-columns:1fr;}}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;min-height:380px;display:flex;flex-direction:column;}
+  .panel h3{font-size:14px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .panel .panel-sub{font-size:11.5px;color:var(--body);opacity:.7;margin-bottom:14px;}
+  .panel-icon{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;}
+  .pi-rubric{background:var(--purple);}
+  .pi-diary{background:var(--signal-spiral);}
+  .pi-map{background:var(--cyan);}
+
+  .lens-row{padding:10px 0;border-bottom:1px solid var(--border);}
+  .lens-row:last-child{border-bottom:none;}
+  .lens-row .lname{font-size:12.5px;font-weight:600;color:var(--primary);margin-bottom:3px;}
+  .lens-row .ldesc{font-size:12px;line-height:1.5;opacity:.85;}
+
+  .diary-entry{padding:11px 0;border-bottom:1px solid var(--border);}
+  .diary-entry:last-child{border-bottom:none;}
+  .diary-entry .drow{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
+  .diary-entry .ddate{font-size:10.5px;opacity:.6;}
+  .diary-entry .dtext{font-size:12px;line-height:1.5;}
+  .source-tag{font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:20px;}
+  .source-tag.keyona{background:#EAF0FC;color:#3457C9;}
+  .source-tag.client{background:#FBE9F1;color:#B23B72;}
+
+  .map-canvas{flex:1;background:#F6FBFB;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-top:4px;}
+  .map-canvas svg{width:100%;height:100%;}
+  .map-footer{font-size:11px;opacity:.65;margin-top:10px;}
+
+  .empty-note{font-size:12px;opacity:.6;font-style:italic;}
+
+  /* ---------- Panel header / expand ---------- */
+  .panel-head-row{display:flex;align-items:flex-start;justify-content:space-between;}
+  .expand-btn{background:none;border:1px solid var(--border);color:var(--body);font-family:'Inter';font-size:11px;font-weight:600;padding:4px 9px;border-radius:7px;cursor:pointer;flex-shrink:0;transition:.15s;}
+  .expand-btn:hover{border-color:var(--cyan);color:var(--cyan);}
+
+  /* ---------- Goal card ---------- */
+  .goal-card{background:#F6FBFB;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;position:relative;}
+  .goal-card .goal-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--purple);margin-bottom:5px;}
+  .goal-card .goal-text{font-size:12.5px;line-height:1.55;color:var(--primary);}
+  .goal-card textarea{width:100%;font-family:'Inter';font-size:12.5px;line-height:1.55;color:var(--primary);border:1px solid var(--cyan);border-radius:7px;padding:8px;resize:vertical;min-height:60px;}
+  .goal-edit-btn{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--body);opacity:.5;font-size:11px;cursor:pointer;}
+  .goal-edit-btn:hover{opacity:1;color:var(--cyan);}
+  .goal-save-row{margin-top:6px;text-align:right;}
+  .goal-save-row button{background:var(--cyan);color:#fff;border:none;font-size:11px;font-weight:600;padding:5px 11px;border-radius:6px;cursor:pointer;}
+
+  /* ---------- Single full-page panel ---------- */
+  .single-panel{display:none;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:26px;max-width:760px;}
+  .single-panel.open{display:block;}
+  .single-panel h3{font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:10px;}
+  .single-panel .panel-sub{font-size:12.5px;margin-bottom:18px;}
+  .panels.hidden{display:none;}
+
+  /* ---------- Diary add form ---------- */
+  .diary-add{background:#F6FBFB;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;}
+  .diary-add select{font-family:'Inter';font-size:12px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;margin-bottom:8px;color:var(--primary);background:#fff;}
+  .diary-add textarea{width:100%;font-family:'Inter';font-size:12.5px;line-height:1.5;border:1px solid var(--border);border-radius:7px;padding:8px;resize:vertical;min-height:54px;margin-bottom:8px;}
+  .diary-add button{background:var(--signal-spiral);color:#fff;border:none;font-size:12px;font-weight:600;padding:7px 13px;border-radius:7px;cursor:pointer;}
+  .diary-add button:hover{opacity:.9;}
+
+  /* ---------- Consideration mode ---------- */
+  .consider-toggle-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+  .consider-select{font-family:'Inter';font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--primary);background:#fff;}
+  .consider-btn{background:#E0A93D;color:#fff;border:none;font-size:12px;font-weight:600;padding:7px 13px;border-radius:7px;cursor:pointer;}
+  .consider-btn.exit{background:var(--body);}
+  .consider-panel{margin-top:14px;background:#FBF1DD;border:1px solid #E0A93D;border-radius:10px;padding:13px 15px;}
+  .consider-panel .ctitle{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#A47620;margin-bottom:8px;}
+  .consider-item{font-size:12px;line-height:1.55;padding:4px 0;color:var(--primary);}
+
+  .loading-note{padding:40px;text-align:center;opacity:.6;font-size:13px;}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="rail">
+    <div class="logo"></div>
+    <div class="icon active">▦</div>
+    <div class="icon">✓</div>
+    <div class="icon">⚙</div>
+  </div>
+
+  <div class="main">
+    <!-- ===== Project list (4 views) ===== -->
+    <div class="board-wrap" id="boardWrap">
+      <div class="topbar">
+        <div>
+          <h1>Wayfinder</h1>
+          <div class="sub">Every active build, one rubric, one diary, one map per project</div>
+        </div>
+        <div class="view-switch">
+          <button class="active" data-view="kanban">Kanban</button>
+          <button data-view="list">List</button>
+          <button data-view="grid">Grid</button>
+          <button data-view="gallery">Gallery</button>
+        </div>
+      </div>
+
+      <div style="padding:22px 0 0;">
+        <!-- KANBAN -->
+        <div id="view-kanban" class="kanban"><div class="loading-note">Loading projects…</div></div>
+        <!-- LIST -->
+        <table id="view-list" class="list-table" style="display:none;">
+          <thead><tr><th>Project</th><th>Venture</th><th>Status</th><th>Last signal</th><th>Last activity</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <!-- GRID -->
+        <div id="view-grid" class="grid-wrap" style="display:none;"></div>
+        <!-- GALLERY -->
+        <div id="view-gallery" class="gallery-wrap" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ===== Detail view ===== -->
+    <div class="detail" id="detailView">
+      <button class="back-btn" onclick="closeDetail()">← All projects</button>
+      <div class="detail-head">
+        <h2 id="detailTitle"></h2>
+        <span class="status-chip" id="detailStatus"></span>
+      </div>
+
+      <div class="panels" id="panelsOverview">
+        <!-- RUBRIC -->
+        <div class="panel">
+          <div class="panel-head-row">
+            <h3><span class="panel-icon pi-rubric">R</span>Rubric</h3>
+            <button class="expand-btn" onclick="openPanel('rubric')">Open page ⤢</button>
+          </div>
+          <div class="panel-sub">Goal, then the gate this project's changes are checked against before push</div>
+          <div id="rubricBody"></div>
+        </div>
+
+        <!-- DIARY -->
+        <div class="panel">
+          <div class="panel-head-row">
+            <h3><span class="panel-icon pi-diary">D</span>Build Diary</h3>
+            <button class="expand-btn" onclick="openPanel('diary')">Open page ⤢</button>
+          </div>
+          <div class="panel-sub">Signals logged across this project's build history</div>
+          <div id="diaryBody"></div>
+        </div>
+
+        <!-- MAP -->
+        <div class="panel">
+          <div class="panel-head-row">
+            <h3><span class="panel-icon pi-map">M</span>Architecture Map</h3>
+            <button class="expand-btn" onclick="openPanel('map')">Open page ⤢</button>
+          </div>
+          <div class="panel-sub">Last generated snapshot of structure and relationships</div>
+          <div class="map-canvas" id="mapCanvas"></div>
+          <div class="map-footer" id="mapFooter"></div>
+        </div>
+      </div>
+
+      <!-- ===== Single full-page panel ===== -->
+      <div class="single-panel" id="singlePanel">
+        <h3 id="singlePanelTitle"></h3>
+        <div class="panel-sub" id="singlePanelSub"></div>
+        <div id="singlePanelBody"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/config.js"></script>
+<script>
+const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.WAYFINDER_CONFIG;
+const REST = `${SUPABASE_URL}/rest/v1`;
+const restHeaders = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json'
+};
+
+let projects = [];
+
+async function fetchProjects(){
+  const query = `select=*,rubric_lenses(name,description,lens_order),diary_entries(id,entry_date,signal,source,kind,author,body)`
+    + `&rubric_lenses.order=lens_order.asc&diary_entries.order=id.desc`;
+  const res = await fetch(`${REST}/projects?${query}`, {headers: restHeaders});
+  const rows = await res.json();
+  return rows.map(row => ({
+    id: row.id, name: row.name, venture: row.venture, status: row.status,
+    signal: row.signal, lastSignal: row.last_signal, lastActivity: row.last_activity,
+    goal: row.goal, map: row.map_type,
+    rubric: (row.rubric_lenses || []).map(r => ({n: r.name, d: r.description})),
+    diary: (row.diary_entries || []).map(d => ({date: d.entry_date, sig: d.signal, source: d.source, kind: d.kind, author: d.author, text: d.body}))
+  }));
+}
+
+const statusOrder = ['Active','Building','Stable','Blocked'];
+const statusClass = {Active:'kc-active',Building:'kc-building',Stable:'kc-stable',Blocked:'kc-blocked'};
+
+// Real parsed node graphs exist only for projects where the Architecture Map
+// has actually been generated. Bill Parser is the proof-of-concept project.
+const projectGraphs = {
+  'bill-parser': {
+    nodes: [
+      {id:'extractor', x:24, y:128, w:108, h:50, label:'Extractor'},
+      {id:'processor', x:184, y:128, w:108, h:50, label:'Processor'},
+      {id:'electric', x:362, y:18, w:122, h:42, label:'Electric Tab'},
+      {id:'water', x:362, y:80, w:122, h:42, label:'Water Tab'},
+      {id:'gas', x:362, y:142, w:122, h:42, label:'Gas Tab'},
+      {id:'reviewqueue', x:362, y:204, w:122, h:42, label:'Review Queue'},
+      {id:'auditlog', x:362, y:266, w:122, h:42, label:'Audit Log'}
+    ],
+    edges: [
+      ['extractor','processor'],
+      ['processor','electric'],['processor','water'],['processor','gas'],
+      ['processor','reviewqueue'],['processor','auditlog']
+    ]
+  }
+};
+
+// Consideration runs are logged by Claude during conversation, not authored
+// by Keyona in the dashboard. She can only view and exit, never create.
+const considerations = {
+  'bill-parser': [
+    {
+      id:'reason-codes',
+      label:'Add reason codes to failed bills',
+      source:'processor',
+      affected:[
+        {id:'reviewqueue', note:'Entries will show a reason code instead of a blank status field.'},
+        {id:'auditlog', note:'A new field gets appended to existing log entries. Format otherwise unchanged.'}
+      ],
+      unaffected:['electric','water','gas','extractor']
+    }
+  ]
+};
+
+function graphSVG(graphDef, considerState){
+  const nodesHTML = graphDef.nodes.map(n=>{
+    let cls = 'node';
+    if(considerState){
+      if(n.id===considerState.sourceId) cls += ' source';
+      else if(considerState.affectedIds.includes(n.id)) cls += ' considering';
+      else cls += ' dimmed';
+    }
+    return `<g class="${cls}" id="node-${n.id}">
+      <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="8"/>
+      <text x="${n.x+n.w/2}" y="${n.y+n.h/2+4}" text-anchor="middle">${n.label}</text>
+    </g>`;
+  }).join('');
+  const edgesHTML = graphDef.edges.map(([a,b])=>{
+    const na = graphDef.nodes.find(n=>n.id===a), nb = graphDef.nodes.find(n=>n.id===b);
+    return `<line x1="${na.x+na.w}" y1="${na.y+na.h/2}" x2="${nb.x}" y2="${nb.y+nb.h/2}"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 510 320" xmlns="http://www.w3.org/2000/svg">
+    <style>
+      line{stroke:#3D5166;stroke-width:1.5;}
+      .node rect{fill:#16384a;stroke:#2C5870;stroke-width:1.5;}
+      .node text{fill:#fff;font-family:Inter,sans-serif;font-size:11px;font-weight:600;}
+      .node.dimmed{opacity:.32;}
+      @keyframes pulseAmber{0%,100%{filter:drop-shadow(0 0 0px rgba(224,169,61,0));}50%{filter:drop-shadow(0 0 7px rgba(224,169,61,.95));}}
+      .node.considering rect{stroke:#E0A93D;stroke-width:2.5;animation:pulseAmber 1.6s ease-in-out infinite;}
+      @keyframes pulsePurple{0%,100%{filter:drop-shadow(0 0 0px rgba(124,58,237,0));}50%{filter:drop-shadow(0 0 7px rgba(124,58,237,.95));}}
+      .node.source rect{fill:#7C3AED;stroke:#7C3AED;animation:pulsePurple 1.6s ease-in-out infinite;}
+    </style>
+    <rect x="0" y="0" width="510" height="320" fill="#0D1F2D"/>
+    ${edgesHTML}${nodesHTML}
+  </svg>`;
+}
+
+function architectureMapBodyHTML(p){
+  const graphDef = projectGraphs[p.id];
+  if(!graphDef){
+    return `<div class="map-canvas" style="height:420px;">${mapCanvasHTML(p)}</div><div class="map-footer">Generated on demand · last run ${p.lastActivity}</div>`;
+  }
+  const opts = considerations[p.id] || [];
+  return `
+    <div class="consider-toggle-row">
+      <select class="consider-select" id="considerSelect">
+        <option value="">Current snapshot</option>
+        ${opts.map(c=>`<option value="${c.id}">Consider: ${c.label}</option>`).join('')}
+      </select>
+      <button class="consider-btn" onclick="applyConsideration('${p.id}')">View</button>
+      <button class="consider-btn exit" onclick="openPanel('map')">Exit consideration mode</button>
+    </div>
+    <div class="map-canvas" id="graphCanvas" style="height:360px;">${graphSVG(graphDef, null)}</div>
+    <div id="considerPanel"></div>
+    <div class="map-footer">Generated on demand · last run ${p.lastActivity}</div>
+  `;
+}
+
+function applyConsideration(pid){
+  const considerId = document.getElementById('considerSelect').value;
+  const graphDef = projectGraphs[pid];
+  const canvas = document.getElementById('graphCanvas');
+  const panel = document.getElementById('considerPanel');
+  if(!considerId){
+    canvas.innerHTML = graphSVG(graphDef, null);
+    panel.innerHTML = '';
+    return;
+  }
+  const c = (considerations[pid]||[]).find(x=>x.id===considerId);
+  canvas.innerHTML = graphSVG(graphDef, {sourceId:c.source, affectedIds:c.affected.map(a=>a.id)});
+  panel.innerHTML = `<div class="consider-panel">
+    <div class="ctitle">What this touches — ${c.label}</div>
+    <div class="consider-item"><strong>Source of change:</strong> ${graphDef.nodes.find(n=>n.id===c.source).label}</div>
+    ${c.affected.map(a=>`<div class="consider-item"><strong>${graphDef.nodes.find(n=>n.id===a.id).label}:</strong> ${a.note}</div>`).join('')}
+    <div class="consider-item" style="opacity:.65;"><strong>Not affected:</strong> ${c.unaffected.map(id=>graphDef.nodes.find(n=>n.id===id).label).join(', ')}</div>
+  </div>`;
+}
+
+function signalPillHTML(sig){
+  const map = {spiral:['spiral','Spiraling'],friction:['friction','Friction'],clean:['clean','Resolved'],breakthrough:['clean','Breakthrough']};
+  const [cls,label] = map[sig] || ['clean', sig];
+  return `<span class="signal-pill ${cls}">${label}</span>`;
+}
+
+// ---- Kanban ----
+function renderKanban(){
+  const el = document.getElementById('view-kanban');
+  el.innerHTML = statusOrder.map(s=>{
+    const items = projects.filter(p=>p.status===s);
+    return `<div class="kanban-col">
+      <h3><span class="dot"></span>${s} (${items.length})</h3>
+      ${items.map(p=>cardHTML(p)).join('')}
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
+}
+function cardHTML(p){
+  return `<div class="pcard" data-pid="${p.id}">
+    <div class="venture">${p.venture}</div>
+    <h4>${p.name}</h4>
+    <div class="meta">${signalPillHTML(p.signal)}<span>${p.lastActivity}</span></div>
+  </div>`;
+}
+
+// ---- List ----
+function renderList(){
+  const tbody = document.querySelector('#view-list tbody');
+  tbody.innerHTML = projects.map(p=>`
+    <tr class="row" data-pid="${p.id}">
+      <td class="pname">${p.name}</td>
+      <td>${p.venture}</td>
+      <td><span class="status-chip ${p.status}">${p.status}</span></td>
+      <td>${signalPillHTML(p.signal)}</td>
+      <td>${p.lastActivity}</td>
+    </tr>`).join('');
+  tbody.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
+}
+
+// ---- Grid ----
+function renderGrid(){
+  const el = document.getElementById('view-grid');
+  el.innerHTML = projects.map(p=>cardHTML(p)).join('');
+  el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
+}
+
+// ---- Gallery ----
+function thumbSVG(type){
+  if(type==='tree'){
+    return `<svg viewBox="0 0 300 120"><rect x="0" y="0" width="300" height="120" fill="#0D1F2D"/>
+      <rect x="14" y="14" width="120" height="92" rx="6" fill="#1A9E9E" opacity="0.85"/>
+      <rect x="140" y="14" width="70" height="44" rx="6" fill="#7C3AED" opacity="0.85"/>
+      <rect x="140" y="62" width="70" height="44" rx="6" fill="#7C3AED" opacity="0.6"/>
+      <rect x="216" y="14" width="70" height="92" rx="6" fill="#1A9E9E" opacity="0.55"/></svg>`;
+  }
+  return `<svg viewBox="0 0 300 120"><rect x="0" y="0" width="300" height="120" fill="#0D1F2D"/>
+    <circle cx="60" cy="60" r="16" fill="#1A9E9E"/>
+    <circle cx="150" cy="30" r="10" fill="#7C3AED"/>
+    <circle cx="150" cy="90" r="10" fill="#7C3AED"/>
+    <circle cx="240" cy="60" r="13" fill="#1A9E9E" opacity="0.7"/>
+    <line x1="60" y1="60" x2="150" y2="30" stroke="#3D5166" stroke-width="1.5"/>
+    <line x1="60" y1="60" x2="150" y2="90" stroke="#3D5166" stroke-width="1.5"/>
+    <line x1="150" y1="30" x2="240" y2="60" stroke="#3D5166" stroke-width="1.5"/>
+    <line x1="150" y1="90" x2="240" y2="60" stroke="#3D5166" stroke-width="1.5"/></svg>`;
+}
+function renderGallery(){
+  const el = document.getElementById('view-gallery');
+  el.innerHTML = projects.map(p=>`
+    <div class="gcard" data-pid="${p.id}">
+      <div class="thumb">${thumbSVG(p.map)}</div>
+      <div class="gbody">
+        <div class="pcard" style="border:none;padding:0;margin:0;cursor:default;">
+          <div class="venture">${p.venture}</div>
+          <h4>${p.name}</h4>
+          <div class="meta">${signalPillHTML(p.signal)}<span>${p.lastActivity}</span></div>
+        </div>
+      </div>
+    </div>`).join('');
+  el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
+}
+
+// ---- View switching ----
+document.querySelectorAll('.view-switch button').forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll('.view-switch button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    ['kanban','list','grid','gallery'].forEach(v=>{
+      document.getElementById('view-'+v).style.display = (v===btn.dataset.view) ? (v==='list'?'table':(v==='kanban'?'flex':'grid')) : 'none';
+    });
+  };
+});
+
+// ---- Shared render helpers ----
+function goalCardHTML(p, editable){
+  return `<div class="goal-card">
+    ${editable ? `<button class="goal-edit-btn" onclick="editGoal('${p.id}')">edit</button>` : ''}
+    <div class="goal-label">Goal</div>
+    <div class="goal-text"${editable ? ` id="goalText-${p.id}"` : ''}>${p.goal}</div>
+  </div>`;
+}
+function rubricBodyHTML(p, editable){
+  return goalCardHTML(p, editable) + p.rubric.map(r=>`
+    <div class="lens-row"><div class="lname">${r.n}</div><div class="ldesc">${r.d}</div></div>`).join('');
+}
+function sourceTagHTML(d){
+  const source = d.source || 'keyona';
+  const kind = d.kind || 'process';
+  const author = d.author || 'Keyona Meeks';
+  const labels = {
+    process: 'Keyona — process note',
+    feature_idea: 'Keyona — feature idea',
+    observation: 'Client observation',
+    request: 'Client request'
+  };
+  const label = source==='client' ? `${labels[kind]} · ${author}` : labels[kind];
+  return `<span class="source-tag ${source}">${label}</span>`;
+}
+function diaryListHTML(p){
+  return p.diary.length ? p.diary.map(d=>`
+    <div class="diary-entry">
+      <div class="drow">${sourceTagHTML(d)}${signalPillHTML(d.sig)}<span class="ddate">${d.date}</span></div>
+      <div class="dtext">${d.text}</div>
+    </div>`).join('') : `<div class="empty-note">No entries logged yet for this project.</div>`;
+}
+function diaryAddFormHTML(p){
+  return `<div class="diary-add">
+    <select id="diarySourceSelect" onchange="toggleAuthorField()">
+      <option value="keyona|process">Keyona — process note</option>
+      <option value="keyona|feature_idea">Keyona — feature idea</option>
+      <option value="client|observation">Client observation</option>
+      <option value="client|request">Client request</option>
+    </select>
+    <input id="diaryAuthorInput" placeholder="Client name (e.g. Bryan Duarte)" style="display:none;font-family:'Inter';font-size:12px;border:1px solid var(--border);border-radius:6px;padding:5px 8px;margin-left:6px;margin-bottom:8px;">
+    <br>
+    <select id="diarySignalSelect">
+      <option value="breakthrough">Breakthrough</option>
+      <option value="friction">Friction</option>
+      <option value="spiral">Spiraling</option>
+      <option value="clean">Resolved</option>
+    </select><br>
+    <textarea id="diaryTextInput" placeholder="What's happening, or paste the relevant line from a transcript..."></textarea>
+    <button onclick="addDiaryEntry('${p.id}')">Log entry</button>
+  </div>`;
+}
+function toggleAuthorField(){
+  const v = document.getElementById('diarySourceSelect').value;
+  document.getElementById('diaryAuthorInput').style.display = v.startsWith('client') ? 'inline-block' : 'none';
+}
+function mapCanvasHTML(p){
+  return thumbSVG(p.map).replace('width="300" height="120"','width="100%" height="100%" preserveAspectRatio="xMidYMid meet"');
+}
+
+// ---- State ----
+let currentProjectId = null;
+let currentPanelView = null; // null | 'rubric' | 'diary' | 'map'
+
+function openDetail(pid){
+  currentProjectId = pid;
+  currentPanelView = null;
+  const p = projects.find(x=>x.id===pid);
+  document.getElementById('boardWrap').classList.add('hidden');
+  document.getElementById('detailView').classList.add('open');
+  document.getElementById('panelsOverview').classList.remove('hidden');
+  document.getElementById('singlePanel').classList.remove('open');
+  document.getElementById('detailTitle').textContent = p.name;
+  const statusEl = document.getElementById('detailStatus');
+  statusEl.textContent = p.status;
+  statusEl.className = 'status-chip ' + p.status;
+
+  document.getElementById('rubricBody').innerHTML = rubricBodyHTML(p, false);
+  document.getElementById('diaryBody').innerHTML = diaryListHTML(p);
+  document.getElementById('mapCanvas').innerHTML = mapCanvasHTML(p);
+  document.getElementById('mapFooter').textContent = 'Generated on demand · last run ' + p.lastActivity;
+
+  document.querySelector('.back-btn').textContent = '← All projects';
+  document.querySelector('.back-btn').onclick = closeDetail;
+}
+
+function openPanel(panel){
+  currentPanelView = panel;
+  const p = projects.find(x=>x.id===currentProjectId);
+  document.getElementById('panelsOverview').classList.add('hidden');
+  document.getElementById('singlePanel').classList.add('open');
+
+  const titles = {
+    rubric: ['<span class="panel-icon pi-rubric">R</span>Rubric', 'Goal, then the gate this project\'s changes are checked against before push'],
+    diary: ['<span class="panel-icon pi-diary">D</span>Build Diary', 'Log a new signal directly, or review everything logged so far'],
+    map: ['<span class="panel-icon pi-map">M</span>Architecture Map', 'Full snapshot of structure and relationships, generated on demand. Consideration runs logged by Claude show what a proposed change would touch.']
+  };
+  document.getElementById('singlePanelTitle').innerHTML = titles[panel][0];
+  document.getElementById('singlePanelSub').textContent = titles[panel][1];
+
+  let body = '';
+  if(panel==='rubric') body = rubricBodyHTML(p, true);
+  if(panel==='diary') body = diaryAddFormHTML(p) + diaryListHTML(p);
+  if(panel==='map') body = architectureMapBodyHTML(p);
+  document.getElementById('singlePanelBody').innerHTML = body;
+
+  document.querySelector('.back-btn').textContent = '← Project overview';
+  document.querySelector('.back-btn').onclick = backToOverview;
+}
+
+function backToOverview(){
+  openDetail(currentProjectId);
+}
+
+function closeDetail(){
+  renderKanban(); renderList(); renderGrid(); renderGallery();
+  document.getElementById('boardWrap').classList.remove('hidden');
+  document.getElementById('detailView').classList.remove('open');
+  currentProjectId = null;
+  currentPanelView = null;
+}
+
+function editGoal(pid){
+  const p = projects.find(x=>x.id===pid);
+  const el = document.getElementById('goalText-'+pid);
+  el.outerHTML = `<textarea id="goalText-${pid}">${p.goal}</textarea>
+    <div class="goal-save-row"><button onclick="saveGoal('${pid}')">Save</button></div>`;
+}
+async function saveGoal(pid){
+  const p = projects.find(x=>x.id===pid);
+  const newGoal = document.getElementById('goalText-'+pid).value;
+  p.goal = newGoal;
+  if(currentPanelView==='rubric') openPanel('rubric'); else openDetail(pid);
+  await fetch(`${REST}/projects?id=eq.${pid}`, {
+    method:'PATCH', headers:{...restHeaders, Prefer:'return=minimal'},
+    body: JSON.stringify({goal:newGoal, updated_at:new Date().toISOString()})
+  });
+}
+
+async function addDiaryEntry(pid){
+  const [source, kind] = document.getElementById('diarySourceSelect').value.split('|');
+  const author = source==='client' ? (document.getElementById('diaryAuthorInput').value.trim() || 'Client') : 'Keyona Meeks';
+  const sig = document.getElementById('diarySignalSelect').value;
+  const text = document.getElementById('diaryTextInput').value.trim();
+  if(!text) return;
+  const p = projects.find(x=>x.id===pid);
+  p.diary.unshift({date:'Just now', sig, source, kind, author, text});
+  p.signal = sig;
+  p.lastSignal = sig==='spiral'?'Spiraling':sig==='friction'?'Friction':sig==='breakthrough'?'Breakthrough':'Resolved';
+  p.lastActivity = 'Just now';
+  openPanel('diary');
+
+  await fetch(`${REST}/diary_entries`, {
+    method:'POST', headers:{...restHeaders, Prefer:'return=minimal'},
+    body: JSON.stringify({project_id:pid, entry_date:'Just now', signal:sig, source, kind, author, body:text})
+  });
+  await fetch(`${REST}/projects?id=eq.${pid}`, {
+    method:'PATCH', headers:{...restHeaders, Prefer:'return=minimal'},
+    body: JSON.stringify({signal:sig, last_signal:p.lastSignal, last_activity:'Just now', updated_at:new Date().toISOString()})
+  });
+}
+
+async function init(){
+  projects = await fetchProjects();
+  renderKanban();
+  renderList();
+  renderGrid();
+  renderGallery();
+}
+init();
+</script>
+</body>
+</html>

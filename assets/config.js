@@ -1,0 +1,4 @@
+window.WAYFINDER_CONFIG = {
+  SUPABASE_URL: 'https://ueosmjwumqqyswmnbyji.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlb3Ntand1bXFxeXN3bW5ieWppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODQ4MzksImV4cCI6MjA5ODc2MDgzOX0.okeFH3_LQbTYBgkS4id75GfLx-aQQRUWdA5gglzFyl4'
+};
