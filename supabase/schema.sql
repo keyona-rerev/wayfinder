@@ -1,6 +1,6 @@
 -- Wayfinder Supabase schema (project: ueosmjwumqqyswmnbyji)
 -- Applied via migrations: init_projects_schema, seed_initial_projects,
--- add_session_log_entries.
+-- add_session_log_entries, add_rubric_evolution_log.
 -- No custom backend: this is a static site calling PostgREST directly with
 -- the anon key, so RLS policies grant the anon role full access rather than
 -- gating on auth (single-user internal tool).
@@ -48,12 +48,23 @@ create table session_log_entries (
   created_at timestamptz not null default now()
 );
 
+create table rubric_evolution_log (
+  id bigserial primary key,
+  project_id text not null references projects(id) on delete cascade,
+  lens_name text not null,
+  old_description text not null,
+  new_description text not null,
+  changed_at timestamptz not null default now()
+);
+
 alter table projects enable row level security;
 alter table rubric_lenses enable row level security;
 alter table diary_entries enable row level security;
 alter table session_log_entries enable row level security;
+alter table rubric_evolution_log enable row level security;
 
 create policy "anon full access" on projects for all using (true) with check (true);
 create policy "anon full access" on rubric_lenses for all using (true) with check (true);
 create policy "anon full access" on diary_entries for all using (true) with check (true);
 create policy "anon full access" on session_log_entries for all using (true) with check (true);
+create policy "anon full access" on rubric_evolution_log for all using (true) with check (true);

@@ -114,8 +114,16 @@
 
   .lens-row{padding:10px 0;border-bottom:1px solid var(--border);}
   .lens-row:last-child{border-bottom:none;}
-  .lens-row .lname{font-size:12.5px;font-weight:600;color:var(--primary);margin-bottom:3px;}
+  .lens-row .lens-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;}
+  .lens-row .lname{font-size:12.5px;font-weight:600;color:var(--primary);}
   .lens-row .ldesc{font-size:12px;line-height:1.5;opacity:.85;}
+  .lens-row textarea{width:100%;font-family:'Inter';font-size:12px;line-height:1.5;color:var(--primary);border:1px solid var(--cyan);border-radius:7px;padding:8px;resize:vertical;min-height:50px;}
+  .lens-edit-btn{background:none;border:none;color:var(--body);opacity:.5;font-size:11px;cursor:pointer;flex-shrink:0;}
+  .lens-edit-btn:hover{opacity:1;color:var(--cyan);}
+
+  .evolution-log{margin-top:18px;border-top:1px solid var(--border);padding-top:14px;}
+  .evolution-log-title{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--purple);margin-bottom:8px;}
+  .trigger-note{font-size:11.5px;opacity:.65;font-style:italic;margin-bottom:14px;}
 
   .diary-entry{padding:11px 0;border-bottom:1px solid var(--border);}
   .diary-entry:last-child{border-bottom:none;}
@@ -288,8 +296,8 @@ const restHeaders = {
 let projects = [];
 
 async function fetchProjects(){
-  const query = `select=*,rubric_lenses(name,description,lens_order),diary_entries(id,entry_date,signal,source,kind,author,body),session_log_entries(id,session_label,session_url,bullets)`
-    + `&rubric_lenses.order=lens_order.asc&diary_entries.order=id.desc&session_log_entries.order=id.desc`;
+  const query = `select=*,rubric_lenses(name,description,lens_order),diary_entries(id,entry_date,signal,source,kind,author,body),session_log_entries(id,session_label,session_url,bullets),rubric_evolution_log(id,lens_name,old_description,new_description,changed_at)`
+    + `&rubric_lenses.order=lens_order.asc&diary_entries.order=id.desc&session_log_entries.order=id.desc&rubric_evolution_log.order=id.desc`;
   const res = await fetch(`${REST}/projects?${query}`, {headers: restHeaders});
   const rows = await res.json();
   return rows.map(row => ({
@@ -298,7 +306,8 @@ async function fetchProjects(){
     goal: row.goal, map: row.map_type,
     rubric: (row.rubric_lenses || []).map(r => ({n: r.name, d: r.description})),
     diary: (row.diary_entries || []).map(d => ({date: d.entry_date, sig: d.signal, source: d.source, kind: d.kind, author: d.author, text: d.body})),
-    sessionLog: (row.session_log_entries || []).map(s => ({label: s.session_label, url: s.session_url, bullets: s.bullets}))
+    sessionLog: (row.session_log_entries || []).map(s => ({label: s.session_label, url: s.session_url, bullets: s.bullets})),
+    rubricLog: (row.rubric_evolution_log || []).map(l => ({lensName: l.lens_name, oldDesc: l.old_description, newDesc: l.new_description, changedAt: new Date(l.changed_at).toLocaleDateString()}))
   }));
 }
 
@@ -519,8 +528,49 @@ function goalCardHTML(p, editable){
   </div>`;
 }
 function rubricBodyHTML(p, editable){
-  return goalCardHTML(p, editable) + p.rubric.map(r=>`
-    <div class="lens-row"><div class="lname">${r.n}</div><div class="ldesc">${r.d}</div></div>`).join('');
+  return goalCardHTML(p, editable) + p.rubric.map((r,i)=>`
+    <div class="lens-row">
+      <div class="lens-head">
+        <div class="lname">${r.n}</div>
+        ${editable ? `<button class="lens-edit-btn" onclick="editLens('${p.id}', ${i})">edit</button>` : ''}
+      </div>
+      <div class="ldesc"${editable ? ` id="lensDesc-${p.id}-${i}"` : ''}>${r.d}</div>
+    </div>`).join('');
+}
+function editLens(pid, idx){
+  const p = projects.find(x=>x.id===pid);
+  const el = document.getElementById(`lensDesc-${pid}-${idx}`);
+  el.outerHTML = `<textarea id="lensDesc-${pid}-${idx}">${p.rubric[idx].d}</textarea>
+    <div class="goal-save-row"><button onclick="saveLens('${pid}', ${idx})">Save</button></div>`;
+}
+async function saveLens(pid, idx){
+  const p = projects.find(x=>x.id===pid);
+  const oldDesc = p.rubric[idx].d;
+  const newDesc = document.getElementById(`lensDesc-${pid}-${idx}`).value.trim();
+  const lensName = p.rubric[idx].n;
+  if(!newDesc || newDesc===oldDesc){ openPanel('rubric'); return; }
+  p.rubric[idx].d = newDesc;
+  p.rubricLog.unshift({lensName, oldDesc, newDesc, changedAt:'Just now'});
+  openPanel('rubric');
+
+  await fetch(`${REST}/rubric_lenses?project_id=eq.${pid}&name=eq.${encodeURIComponent(lensName)}`, {
+    method:'PATCH', headers:{...restHeaders, Prefer:'return=minimal'},
+    body: JSON.stringify({description:newDesc})
+  });
+  await fetch(`${REST}/rubric_evolution_log`, {
+    method:'POST', headers:{...restHeaders, Prefer:'return=minimal'},
+    body: JSON.stringify({project_id:pid, lens_name:lensName, old_description:oldDesc, new_description:newDesc})
+  });
+}
+function rubricEvolutionLogHTML(p){
+  return `<div class="evolution-log">
+    <div class="evolution-log-title">Rubric evolution log</div>
+    ${p.rubricLog.length ? p.rubricLog.map(l=>`
+      <div class="diary-entry">
+        <div class="drow"><span class="lname">${l.lensName}</span><span class="ddate">${l.changedAt}</span></div>
+        <div class="dtext"><strong>From:</strong> ${l.oldDesc}<br><strong>To:</strong> ${l.newDesc}</div>
+      </div>`).join('') : `<div class="empty-note">No rubric changes logged yet.</div>`}
+  </div>`;
 }
 function sourceTagHTML(d){
   const source = d.source || 'keyona';
@@ -650,7 +700,7 @@ function openPanel(panel){
 
   let body = '';
   if(panel==='sessionlog') body = sessionLogAddFormHTML(p) + sessionLogTableHTML(p);
-  if(panel==='rubric') body = rubricBodyHTML(p, true);
+  if(panel==='rubric') body = `<div class="trigger-note">Triggered on demand by saying "run the rubric" during a session on this project, not automatic detection.</div>` + rubricBodyHTML(p, true) + rubricEvolutionLogHTML(p);
   if(panel==='diary') body = diaryAddFormHTML(p) + diaryListHTML(p);
   if(panel==='map') body = architectureMapBodyHTML(p);
   document.getElementById('singlePanelBody').innerHTML = body;
