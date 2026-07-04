@@ -355,77 +355,6 @@ async function fetchProjects(){
 const statusOrder = ['Active','Building','Stable','Blocked'];
 const statusClass = {Active:'kc-active',Building:'kc-building',Stable:'kc-stable',Blocked:'kc-blocked'};
 
-// Real parsed node graphs exist only for projects where the Architecture Map
-// has actually been generated. Bill Parser is the proof-of-concept project.
-const projectGraphs = {
-  'bill-parser': {
-    nodes: [
-      {id:'extractor', x:24, y:128, w:108, h:50, label:'Extractor'},
-      {id:'processor', x:184, y:128, w:108, h:50, label:'Processor'},
-      {id:'electric', x:362, y:18, w:122, h:42, label:'Electric Tab'},
-      {id:'water', x:362, y:80, w:122, h:42, label:'Water Tab'},
-      {id:'gas', x:362, y:142, w:122, h:42, label:'Gas Tab'},
-      {id:'reviewqueue', x:362, y:204, w:122, h:42, label:'Review Queue'},
-      {id:'auditlog', x:362, y:266, w:122, h:42, label:'Audit Log'}
-    ],
-    edges: [
-      ['extractor','processor'],
-      ['processor','electric'],['processor','water'],['processor','gas'],
-      ['processor','reviewqueue'],['processor','auditlog']
-    ]
-  }
-};
-
-// Consideration runs are logged by Claude during conversation, not authored
-// by Keyona in the dashboard. She can only view and exit, never create.
-const considerations = {
-  'bill-parser': [
-    {
-      id:'reason-codes',
-      label:'Add reason codes to failed bills',
-      source:'processor',
-      affected:[
-        {id:'reviewqueue', note:'Entries will show a reason code instead of a blank status field.'},
-        {id:'auditlog', note:'A new field gets appended to existing log entries. Format otherwise unchanged.'}
-      ],
-      unaffected:['electric','water','gas','extractor']
-    }
-  ]
-};
-
-function graphSVG(graphDef, considerState){
-  const nodesHTML = graphDef.nodes.map(n=>{
-    let cls = 'node';
-    if(considerState){
-      if(n.id===considerState.sourceId) cls += ' source';
-      else if(considerState.affectedIds.includes(n.id)) cls += ' considering';
-      else cls += ' dimmed';
-    }
-    return `<g class="${cls}" id="node-${n.id}">
-      <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="8"/>
-      <text x="${n.x+n.w/2}" y="${n.y+n.h/2+4}" text-anchor="middle">${n.label}</text>
-    </g>`;
-  }).join('');
-  const edgesHTML = graphDef.edges.map(([a,b])=>{
-    const na = graphDef.nodes.find(n=>n.id===a), nb = graphDef.nodes.find(n=>n.id===b);
-    return `<line x1="${na.x+na.w}" y1="${na.y+na.h/2}" x2="${nb.x}" y2="${nb.y+nb.h/2}"/>`;
-  }).join('');
-  return `<svg viewBox="0 0 510 320" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      line{stroke:#3D5166;stroke-width:1.5;}
-      .node rect{fill:#16384a;stroke:#2C5870;stroke-width:1.5;}
-      .node text{fill:#fff;font-family:Inter,sans-serif;font-size:11px;font-weight:600;}
-      .node.dimmed{opacity:.32;}
-      @keyframes pulseAmber{0%,100%{filter:drop-shadow(0 0 0px rgba(224,169,61,0));}50%{filter:drop-shadow(0 0 7px rgba(224,169,61,.95));}}
-      .node.considering rect{stroke:#E0A93D;stroke-width:2.5;animation:pulseAmber 1.6s ease-in-out infinite;}
-      @keyframes pulsePurple{0%,100%{filter:drop-shadow(0 0 0px rgba(124,58,237,0));}50%{filter:drop-shadow(0 0 7px rgba(124,58,237,.95));}}
-      .node.source rect{fill:#7C3AED;stroke:#7C3AED;animation:pulsePurple 1.6s ease-in-out infinite;}
-    </style>
-    <rect x="0" y="0" width="510" height="320" fill="#0D1F2D"/>
-    ${edgesHTML}${nodesHTML}
-  </svg>`;
-}
-
 const GROUP_PALETTE = ['#1A9E9E','#7C3AED','#E0A93D','#4D9D6F','#E0635A','#3457C9','#B23B72','#8FA6B0'];
 const groupColorCache = {};
 function architectureGroupOf(filePath){
@@ -572,47 +501,6 @@ async function renderRealArchitectureMap(p){
   currentConsiderations = considerations;
   container.innerHTML = `${considerToggleRowHTML(considerations)}<div class="real-graph-canvas" id="realGraphCanvas"></div>${realGraphLegendHTML(graph.nodes)}<div class="real-graph-stats">Generated via code-review-graph · ${graph.snapshot.files_parsed} files, ${graph.nodes.length} file nodes, ${graph.edges.length} resolved internal imports · last run ${new Date(graph.snapshot.generated_at).toLocaleString()}</div>`;
   renderForceGraph(document.getElementById('realGraphCanvas'), graph);
-}
-
-function architectureMapBodyHTML(p){
-  const graphDef = projectGraphs[p.id];
-  if(!graphDef){
-    return `<div class="map-canvas" style="height:420px;">${mapCanvasHTML(p)}</div><div class="map-footer">Generated on demand · last run ${p.lastActivity}</div>`;
-  }
-  const opts = considerations[p.id] || [];
-  return `
-    <div class="consider-toggle-row">
-      <select class="consider-select" id="considerSelect">
-        <option value="">Current snapshot</option>
-        ${opts.map(c=>`<option value="${c.id}">Consider: ${c.label}</option>`).join('')}
-      </select>
-      <button class="consider-btn" onclick="applyConsideration('${p.id}')">View</button>
-      <button class="consider-btn exit" onclick="openPanel('map')">Exit consideration mode</button>
-    </div>
-    <div class="map-canvas" id="graphCanvas" style="height:360px;">${graphSVG(graphDef, null)}</div>
-    <div id="considerPanel"></div>
-    <div class="map-footer">Generated on demand · last run ${p.lastActivity}</div>
-  `;
-}
-
-function applyConsideration(pid){
-  const considerId = document.getElementById('considerSelect').value;
-  const graphDef = projectGraphs[pid];
-  const canvas = document.getElementById('graphCanvas');
-  const panel = document.getElementById('considerPanel');
-  if(!considerId){
-    canvas.innerHTML = graphSVG(graphDef, null);
-    panel.innerHTML = '';
-    return;
-  }
-  const c = (considerations[pid]||[]).find(x=>x.id===considerId);
-  canvas.innerHTML = graphSVG(graphDef, {sourceId:c.source, affectedIds:c.affected.map(a=>a.id)});
-  panel.innerHTML = `<div class="consider-panel">
-    <div class="ctitle">What this touches — ${c.label}</div>
-    <div class="consider-item"><strong>Source of change:</strong> ${graphDef.nodes.find(n=>n.id===c.source).label}</div>
-    ${c.affected.map(a=>`<div class="consider-item"><strong>${graphDef.nodes.find(n=>n.id===a.id).label}:</strong> ${a.note}</div>`).join('')}
-    <div class="consider-item" style="opacity:.65;"><strong>Not affected:</strong> ${c.unaffected.map(id=>graphDef.nodes.find(n=>n.id===id).label).join(', ')}</div>
-  </div>`;
 }
 
 function signalPillHTML(sig){
@@ -896,9 +784,8 @@ function openPanel(panel){
   if(panel==='sessionlog') body = sessionLogAddFormHTML(p) + sessionLogTableHTML(p);
   if(panel==='rubric') body = `<div class="trigger-note">Triggered on demand by saying "run the rubric" during a session on this project, not automatic detection.</div>` + rubricBodyHTML(p, true) + rubricEvolutionLogHTML(p);
   if(panel==='diary') body = diaryAddFormHTML(p) + diaryListHTML(p);
-  if(panel==='map' && projectGraphs[p.id]) body = architectureMapBodyHTML(p);
   document.getElementById('singlePanelBody').innerHTML = body;
-  if(panel==='map' && !projectGraphs[p.id]) renderRealArchitectureMap(p);
+  if(panel==='map') renderRealArchitectureMap(p);
 
   document.querySelector('.back-btn').textContent = '← Project overview';
   document.querySelector('.back-btn').onclick = backToOverview;
