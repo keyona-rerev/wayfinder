@@ -230,22 +230,32 @@
   @keyframes pulsePurpleReal{0%,100%{filter:drop-shadow(0 0 0px rgba(124,58,237,0));}50%{filter:drop-shadow(0 0 6px rgba(124,58,237,.95));}}
   .fnode.source circle{fill:#7C3AED;stroke:#7C3AED;animation:pulsePurpleReal 1.6s ease-in-out infinite;}
 
-  /* ---------- Unmapped GitHub repos ---------- */
-  .unmapped-section{margin-top:24px;}
-  .unmapped-toggle{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-family:'Inter';font-size:13px;font-weight:600;color:var(--body);cursor:pointer;width:100%;text-align:left;}
-  .unmapped-toggle:hover{border-color:var(--cyan);color:var(--cyan);}
-  .unmapped-panel{margin-top:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:6px 14px;max-height:420px;overflow:auto;}
-  .unmapped-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 4px;border-bottom:1px solid var(--border);}
-  .unmapped-row:last-child{border-bottom:none;}
-  .unmapped-row-main{min-width:0;flex:1;}
-  .unmapped-row-name{font-size:13px;font-weight:600;color:var(--primary);}
-  .unmapped-row-name a{color:inherit;text-decoration:none;}
-  .unmapped-row-name a:hover{text-decoration:underline;}
-  .unmapped-row-desc{font-size:11.5px;opacity:.7;margin-top:2px;}
-  .unmapped-row-meta{font-size:10.5px;opacity:.6;margin-top:3px;display:flex;gap:8px;}
-  .unmapped-add-btn{background:var(--cyan);color:#fff;border:none;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;cursor:pointer;flex-shrink:0;}
-  .unmapped-add-btn:hover{opacity:.9;}
-  .unmapped-add-btn:disabled{opacity:.5;cursor:default;}
+  /* ---------- Rail icons ---------- */
+  .rail-icon{width:34px;height:34px;border-radius:9px;background:transparent;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;opacity:.55;transition:.15s;position:relative;padding:0;}
+  .rail-icon:hover{opacity:1;background:rgba(255,255,255,.1);}
+  .rail-icon.active{opacity:1;background:rgba(255,255,255,.18);}
+  .rail-icon-badge{position:absolute;top:-4px;right:-4px;background:var(--signal-spiral);color:#fff;font-size:9.5px;font-weight:700;line-height:1;padding:3px 5px;border-radius:20px;min-width:14px;text-align:center;display:none;}
+
+  /* ---------- Unmapped GitHub repos page ---------- */
+  .repo-table-link{color:var(--primary);font-weight:600;text-decoration:none;}
+  .repo-table-link:hover{text-decoration:underline;color:var(--cyan);}
+  .repo-add-btn{background:var(--cyan);color:#fff;border:none;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;cursor:pointer;flex-shrink:0;}
+  .repo-add-btn:hover{opacity:.9;}
+  .repo-add-btn:disabled{opacity:.5;cursor:default;}
+  .repo-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 14px 12px;display:flex;flex-direction:column;gap:8px;}
+  .repo-card:hover{border-color:var(--cyan);}
+  .repo-card .repo-name{font-size:14px;font-weight:600;color:var(--primary);}
+  .repo-card .repo-name a{color:inherit;text-decoration:none;}
+  .repo-card .repo-name a:hover{text-decoration:underline;}
+  .repo-card .repo-desc{font-size:12px;line-height:1.5;opacity:.75;flex:1;}
+  .repo-card .repo-meta{font-size:10.5px;opacity:.6;display:flex;gap:8px;flex-wrap:wrap;}
+  .repo-card .repo-add-btn{align-self:flex-start;margin-top:2px;}
+  .repo-gcard{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:.15s;}
+  .repo-gcard:hover{border-color:var(--cyan);box-shadow:0 6px 18px rgba(13,31,45,.08);}
+  .repo-gcard .thumb{height:90px;position:relative;overflow:hidden;}
+  .repo-gcard .thumb svg{width:100%;height:100%;}
+  .repo-gcard .gbody{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;}
+  .repo-empty{padding:40px;text-align:center;opacity:.6;font-size:13px;}
 
   .analysis-pending-pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:6px;}
 
@@ -265,7 +275,11 @@
 
 <div class="shell">
   <div class="rail">
-    <div class="logo"></div>
+    <div class="logo" onclick="showBoard()" title="Wayfinder board" style="cursor:pointer;"></div>
+    <button class="rail-icon" id="railReposBtn" title="Unmapped GitHub repos" onclick="openReposPage()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M9 21v-6h6v6"/></svg>
+      <span class="rail-icon-badge" id="railReposBadge"></span>
+    </button>
   </div>
 
   <div class="main">
@@ -298,18 +312,35 @@
         <div id="view-gallery" class="gallery-wrap" style="display:none;"></div>
       </div>
 
-      <!-- ===== Unmapped GitHub repos ===== -->
-      <div class="unmapped-section">
-        <button class="unmapped-toggle" onclick="toggleUnmappedRepos()"><span id="unmappedToggleLabel">Show unmapped GitHub repos</span></button>
-        <div id="unmappedReposPanel" class="unmapped-panel" style="display:none;">
-          <div id="unmappedReposList"></div>
+    </div>
+
+    <!-- ===== Unmapped GitHub repos page ===== -->
+    <div class="board-wrap hidden" id="reposWrap">
+      <button class="back-btn" onclick="showBoard()">← Board</button>
+      <div class="topbar" style="padding-top:0;">
+        <div>
+          <h1>Unmapped GitHub repos</h1>
+          <div class="sub">Every synced repo not yet mapped to a Wayfinder project</div>
         </div>
+        <div class="view-switch" id="reposViewSwitch">
+          <button class="active" data-reposview="list">List</button>
+          <button data-reposview="grid">Grid</button>
+          <button data-reposview="gallery">Gallery</button>
+        </div>
+      </div>
+      <div style="padding:22px 0 0;">
+        <table id="repos-view-list" class="list-table">
+          <thead><tr><th>Repo</th><th>Description</th><th>Language</th><th>Visibility</th><th>Last pushed</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="repos-view-grid" class="grid-wrap" style="display:none;"></div>
+        <div id="repos-view-gallery" class="gallery-wrap" style="display:none;"></div>
       </div>
     </div>
 
     <!-- ===== Detail view ===== -->
     <div class="detail" id="detailView">
-      <button class="back-btn" onclick="closeDetail()">← All projects</button>
+      <button class="back-btn" id="detailBackBtn" onclick="closeDetail()">← All projects</button>
       <div class="detail-head">
         <h2 id="detailTitle"></h2>
         <span class="status-chip" id="detailStatus"></span>
@@ -708,12 +739,22 @@ function renderGallery(){
 }
 
 // ---- View switching ----
-document.querySelectorAll('.view-switch button').forEach(btn=>{
+document.querySelectorAll('#boardWrap .view-switch button').forEach(btn=>{
   btn.onclick = ()=>{
-    document.querySelectorAll('.view-switch button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('#boardWrap .view-switch button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     ['kanban','list','grid','gallery'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===btn.dataset.view) ? (v==='list'?'table':(v==='kanban'?'flex':'grid')) : 'none';
+    });
+  };
+});
+
+document.querySelectorAll('#reposWrap .view-switch button').forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll('#reposWrap .view-switch button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    ['list','grid','gallery'].forEach(v=>{
+      document.getElementById('repos-view-'+v).style.display = (v===btn.dataset.reposview) ? (v==='list'?'table':'grid') : 'none';
     });
   };
 });
@@ -1126,6 +1167,8 @@ function openDetail(pid){
   currentPanelView = null;
   const p = projects.find(x=>x.id===pid);
   document.getElementById('boardWrap').classList.add('hidden');
+  document.getElementById('reposWrap').classList.add('hidden');
+  document.getElementById('railReposBtn').classList.remove('active');
   document.getElementById('detailView').classList.add('open');
   document.getElementById('panelsOverview').classList.remove('hidden');
   document.getElementById('singlePanel').classList.remove('open');
@@ -1144,8 +1187,8 @@ function openDetail(pid){
   document.getElementById('techStackBody').innerHTML = techStackListHTML(p);
   document.getElementById('deepTestBody').innerHTML = deepTestPreviewHTML(p);
 
-  document.querySelector('.back-btn').textContent = '← All projects';
-  document.querySelector('.back-btn').onclick = closeDetail;
+  document.getElementById('detailBackBtn').textContent = '← All projects';
+  document.getElementById('detailBackBtn').onclick = closeDetail;
 }
 
 function openPanel(panel){
@@ -1174,8 +1217,8 @@ function openPanel(panel){
   document.getElementById('singlePanelBody').innerHTML = body;
   if(panel==='map') renderRealArchitectureMap(p);
 
-  document.querySelector('.back-btn').textContent = '← Project overview';
-  document.querySelector('.back-btn').onclick = backToOverview;
+  document.getElementById('detailBackBtn').textContent = '← Project overview';
+  document.getElementById('detailBackBtn').onclick = backToOverview;
 }
 
 function backToOverview(){
@@ -1183,12 +1226,29 @@ function backToOverview(){
 }
 
 function closeDetail(){
+  showBoard();
+}
+
+function showBoard(){
   stopStatusPolling();
-  renderKanban(); renderList(); renderGrid(); renderGallery();
-  document.getElementById('boardWrap').classList.remove('hidden');
-  document.getElementById('detailView').classList.remove('open');
   currentProjectId = null;
   currentPanelView = null;
+  document.getElementById('detailView').classList.remove('open');
+  document.getElementById('reposWrap').classList.add('hidden');
+  document.getElementById('railReposBtn').classList.remove('active');
+  document.getElementById('boardWrap').classList.remove('hidden');
+  renderKanban(); renderList(); renderGrid(); renderGallery();
+}
+
+function openReposPage(){
+  stopStatusPolling();
+  currentProjectId = null;
+  currentPanelView = null;
+  document.getElementById('detailView').classList.remove('open');
+  document.getElementById('boardWrap').classList.add('hidden');
+  document.getElementById('reposWrap').classList.remove('hidden');
+  document.getElementById('railReposBtn').classList.add('active');
+  renderReposPage();
 }
 
 function editGoal(pid){
@@ -1238,29 +1298,83 @@ async function fetchGithubRepos(){
   return res.json();
 }
 
-function toggleUnmappedRepos(){
-  const panel = document.getElementById('unmappedReposPanel');
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+function unmappedRepos(){
+  const mapped = new Set(projects.filter(p => p.repoFullName).map(p => p.repoFullName));
+  return githubRepos.filter(r => !mapped.has(r.full_name));
 }
 
-function renderUnmappedRepos(){
-  const mapped = new Set(projects.filter(p => p.repoFullName).map(p => p.repoFullName));
-  const unmapped = githubRepos.filter(r => !mapped.has(r.full_name));
-  document.getElementById('unmappedToggleLabel').textContent = `Show unmapped GitHub repos (${unmapped.length})`;
-  const list = document.getElementById('unmappedReposList');
+function repoAddButtonHTML(fullName){
+  return `<button class="repo-add-btn" onclick="addRepoAsProject('${fullName}')">+ Add to Wayfinder</button>`;
+}
+
+function repoMetaHTML(r){
+  return `${r.private ? 'Private' : 'Public'}${r.language ? ' · ' + r.language : ''}${r.pushed_at ? ' · pushed ' + new Date(r.pushed_at).toLocaleDateString() : ''}`;
+}
+
+function repoThumbSVG(name){
+  const sum = [...name].reduce((a,c)=>a + c.charCodeAt(0), 0);
+  const color = GROUP_PALETTE[sum % GROUP_PALETTE.length];
+  const initials = name.slice(0,2).toUpperCase();
+  return `<svg viewBox="0 0 300 120"><rect x="0" y="0" width="300" height="120" fill="#0D1F2D"/><rect x="0" y="0" width="300" height="120" fill="${color}" opacity="0.18"/><text x="150" y="70" font-size="40" font-family="Outfit,sans-serif" font-weight="600" fill="${color}" text-anchor="middle">${initials}</text></svg>`;
+}
+
+function renderReposList(){
+  const tbody = document.querySelector('#repos-view-list tbody');
+  const unmapped = unmappedRepos();
   if(!unmapped.length){
-    list.innerHTML = `<div class="empty-note">Every synced repo is mapped to a project.</div>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="repo-empty">Every synced repo is mapped to a project.</td></tr>`;
     return;
   }
-  list.innerHTML = unmapped.map(r => `
-    <div class="unmapped-row" data-repo="${r.full_name}">
-      <div class="unmapped-row-main">
-        <div class="unmapped-row-name"><a href="${r.html_url}" target="_blank" rel="noopener">${r.name}</a></div>
-        ${r.description ? `<div class="unmapped-row-desc">${r.description}</div>` : ''}
-        <div class="unmapped-row-meta">${r.private ? 'Private' : 'Public'}${r.language ? ' · ' + r.language : ''}${r.pushed_at ? ' · pushed ' + new Date(r.pushed_at).toLocaleDateString() : ''}</div>
-      </div>
-      <button class="unmapped-add-btn" onclick="addRepoAsProject('${r.full_name}')">+ Add to Wayfinder</button>
+  tbody.innerHTML = unmapped.map(r => `
+    <tr data-repo="${r.full_name}">
+      <td class="pname"><a class="repo-table-link" href="${r.html_url}" target="_blank" rel="noopener">${r.name}</a></td>
+      <td>${r.description || ''}</td>
+      <td>${r.language || ''}</td>
+      <td>${r.private ? 'Private' : 'Public'}</td>
+      <td>${r.pushed_at ? new Date(r.pushed_at).toLocaleDateString() : ''}</td>
+      <td>${repoAddButtonHTML(r.full_name)}</td>
+    </tr>`).join('');
+}
+
+function renderReposGrid(){
+  const el = document.getElementById('repos-view-grid');
+  const unmapped = unmappedRepos();
+  if(!unmapped.length){ el.innerHTML = `<div class="repo-empty">Every synced repo is mapped to a project.</div>`; return; }
+  el.innerHTML = unmapped.map(r => `
+    <div class="repo-card" data-repo="${r.full_name}">
+      <div class="repo-name"><a href="${r.html_url}" target="_blank" rel="noopener">${r.name}</a></div>
+      ${r.description ? `<div class="repo-desc">${r.description}</div>` : ''}
+      <div class="repo-meta">${repoMetaHTML(r)}</div>
+      ${repoAddButtonHTML(r.full_name)}
     </div>`).join('');
+}
+
+function renderReposGallery(){
+  const el = document.getElementById('repos-view-gallery');
+  const unmapped = unmappedRepos();
+  if(!unmapped.length){ el.innerHTML = `<div class="repo-empty">Every synced repo is mapped to a project.</div>`; return; }
+  el.innerHTML = unmapped.map(r => `
+    <div class="repo-gcard" data-repo="${r.full_name}">
+      <div class="thumb">${repoThumbSVG(r.name)}</div>
+      <div class="gbody">
+        <div class="repo-name"><a href="${r.html_url}" target="_blank" rel="noopener">${r.name}</a></div>
+        ${r.description ? `<div class="repo-desc">${r.description}</div>` : ''}
+        <div class="repo-meta">${repoMetaHTML(r)}</div>
+        ${repoAddButtonHTML(r.full_name)}
+      </div>
+    </div>`).join('');
+}
+
+function updateRailReposBadge(){
+  const n = unmappedRepos().length;
+  const badge = document.getElementById('railReposBadge');
+  badge.textContent = n;
+  badge.style.display = n > 0 ? 'flex' : 'none';
+}
+
+function renderReposPage(){
+  renderReposList(); renderReposGrid(); renderReposGallery();
+  updateRailReposBadge();
 }
 
 function slugify(s){
@@ -1273,8 +1387,7 @@ function humanizeRepoName(name){
 async function addRepoAsProject(fullName){
   const repo = githubRepos.find(r => r.full_name === fullName);
   if(!repo) return;
-  const btn = document.querySelector(`.unmapped-row[data-repo="${fullName}"] .unmapped-add-btn`);
-  if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
+  document.querySelectorAll(`[data-repo="${fullName}"] .repo-add-btn`).forEach(btn => { btn.disabled = true; btn.textContent = 'Adding…'; });
 
   let id = slugify(repo.name);
   if(projects.some(p => p.id === id)) id = slugify(`${repo.owner}-${repo.name}`);
@@ -1301,11 +1414,11 @@ async function addRepoAsProject(fullName){
     goal: newProjectRow.goal, map: newProjectRow.map_type, repoFullName: fullName, hasArchitectureMap: false,
     analysisStatus: 'queued', analysisStartedAt: null, analysisError: null,
     rubric: lensNames.map(n => ({n, d: 'Not yet defined for this project.'})),
-    diary: [], sessionLog: [], rubricLog: []
+    diary: [], sessionLog: [], rubricLog: [], techStack: [], deepTestItems: [], deepTestRuns: []
   });
 
   renderKanban(); renderList(); renderGrid(); renderGallery();
-  renderUnmappedRepos();
+  renderReposPage();
   openDetail(id);
 }
 
@@ -1315,7 +1428,7 @@ async function init(){
   renderList();
   renderGrid();
   renderGallery();
-  renderUnmappedRepos();
+  updateRailReposBadge();
 }
 init();
 </script>
