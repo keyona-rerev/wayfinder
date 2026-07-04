@@ -5,6 +5,7 @@
 <title>Wayfinder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
   :root{
     --bg:#F0F7F7;
@@ -179,6 +180,21 @@
   .consider-item{font-size:12px;line-height:1.55;padding:4px 0;color:var(--primary);}
 
   .loading-note{padding:40px;text-align:center;opacity:.6;font-size:13px;}
+
+  .real-graph-canvas{width:100%;height:520px;background:#0D1F2D;border-radius:10px;position:relative;overflow:hidden;}
+  .real-graph-canvas svg{width:100%;height:100%;cursor:grab;}
+  .real-graph-legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:10px;font-size:11px;}
+  .real-graph-legend .legend-item{display:flex;align-items:center;gap:5px;color:var(--body);}
+  .real-graph-legend .legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .real-graph-stats{font-size:11px;opacity:.65;margin-top:8px;}
+  .graph-node-link{stroke:#3D5166;stroke-opacity:.5;}
+
+  .fnode circle{transition:opacity .2s;}
+  .fnode.dimmed circle{opacity:.25;}
+  @keyframes pulseAmberReal{0%,100%{filter:drop-shadow(0 0 0px rgba(224,169,61,0));}50%{filter:drop-shadow(0 0 6px rgba(224,169,61,.95));}}
+  .fnode.considering circle{stroke:#E0A93D;stroke-width:2.5;animation:pulseAmberReal 1.6s ease-in-out infinite;}
+  @keyframes pulsePurpleReal{0%,100%{filter:drop-shadow(0 0 0px rgba(124,58,237,0));}50%{filter:drop-shadow(0 0 6px rgba(124,58,237,.95));}}
+  .fnode.source circle{fill:#7C3AED;stroke:#7C3AED;animation:pulsePurpleReal 1.6s ease-in-out infinite;}
 </style>
 </head>
 <body>
@@ -383,6 +399,154 @@ function graphSVG(graphDef, considerState){
     <rect x="0" y="0" width="510" height="320" fill="#0D1F2D"/>
     ${edgesHTML}${nodesHTML}
   </svg>`;
+}
+
+const GROUP_PALETTE = ['#1A9E9E','#7C3AED','#E0A93D','#4D9D6F','#E0635A','#3457C9','#B23B72','#8FA6B0'];
+const groupColorCache = {};
+function architectureGroupOf(filePath){
+  const parts = filePath.split('/');
+  if(parts[0] !== 'src' || parts.length <= 2) return parts[0] || 'root';
+  return parts.slice(0,2).join('/');
+}
+function colorForGroup(group){
+  if(!(group in groupColorCache)){
+    const idx = Object.keys(groupColorCache).length % GROUP_PALETTE.length;
+    groupColorCache[group] = GROUP_PALETTE[idx];
+  }
+  return groupColorCache[group];
+}
+
+async function fetchArchitectureGraph(pid){
+  const [snapRes, nodeRes, edgeRes] = await Promise.all([
+    fetch(`${REST}/architecture_snapshots?project_id=eq.${pid}`, {headers: restHeaders}),
+    fetch(`${REST}/architecture_nodes?project_id=eq.${pid}&kind=eq.File&select=qualified_name,name,file_path,language`, {headers: restHeaders}),
+    fetch(`${REST}/architecture_edges?project_id=eq.${pid}&kind=eq.IMPORTS_FROM&resolved=eq.true&select=source_qualified,target_qualified`, {headers: restHeaders})
+  ]);
+  const snaps = await snapRes.json();
+  if(!snaps.length) return null;
+  const nodes = await nodeRes.json();
+  const edges = await edgeRes.json();
+  return {snapshot: snaps[0], nodes, edges};
+}
+
+function renderForceGraph(container, graph){
+  const width = container.clientWidth || 700;
+  const height = 520;
+  const nodes = graph.nodes.map(n => ({id: n.qualified_name, label: n.name, group: architectureGroupOf(n.file_path)}));
+  const nodeIds = new Set(nodes.map(n => n.id));
+  const links = graph.edges
+    .filter(e => nodeIds.has(e.source_qualified) && nodeIds.has(e.target_qualified))
+    .map(e => ({source: e.source_qualified, target: e.target_qualified}));
+
+  if(container._sim) container._sim.stop();
+  container.innerHTML = '';
+  const svg = d3.select(container).append('svg').attr('viewBox', [0, 0, width, height]);
+  const g = svg.append('g');
+  const zoom = d3.zoom().scaleExtent([0.05, 4]).on('zoom', (e) => g.attr('transform', e.transform));
+  svg.call(zoom);
+
+  const link = g.append('g').selectAll('line').data(links).join('line').attr('class', 'graph-node-link');
+  const node = g.append('g').selectAll('g').data(nodes).join('g').attr('class', 'fnode');
+  node.append('circle').attr('r', 6).attr('fill', d => colorForGroup(d.group)).attr('stroke', '#0D1F2D').attr('stroke-width', 1);
+  node.append('title').text(d => d.label);
+
+  const sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(46).strength(0.25))
+    .force('charge', d3.forceManyBody().strength(-70))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collide', d3.forceCollide(12));
+
+  sim.on('tick', () => {
+    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+  sim.on('end', () => {
+    const xs = nodes.map(d => d.x), ys = nodes.map(d => d.y);
+    const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
+    const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+    const pad = 30;
+    const scale = Math.min(4, 0.9 / Math.max((x1 - x0 + pad * 2) / width, (y1 - y0 + pad * 2) / height, 1e-6));
+    const tx = width / 2 - scale * (x0 + x1) / 2;
+    const ty = height / 2 - scale * (y0 + y1) / 2;
+    svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+  });
+
+  const drag = d3.drag()
+    .on('start', (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+    .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+    .on('end', (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null; });
+  node.call(drag);
+
+  container._fnodeSelection = node;
+  container._sim = sim;
+}
+
+function realGraphLegendHTML(nodes){
+  const groups = [...new Set(nodes.map(n => architectureGroupOf(n.file_path)))].sort();
+  groups.forEach(colorForGroup);
+  return `<div class="real-graph-legend">${groups.map(g => `<span class="legend-item"><span class="legend-dot" style="background:${colorForGroup(g)}"></span>${g}</span>`).join('')}</div>`;
+}
+
+async function fetchConsiderations(pid){
+  const res = await fetch(`${REST}/considerations?project_id=eq.${pid}&select=id,label,source_qualified,consideration_affected(target_qualified,note,depth)&order=id.desc`, {headers: restHeaders});
+  return res.json();
+}
+
+function considerToggleRowHTML(considerations){
+  return `<div class="consider-toggle-row">
+    <select class="consider-select" id="realConsiderSelect">
+      <option value="">Current snapshot</option>
+      ${considerations.map(c=>`<option value="${c.id}">Consider: ${c.label}</option>`).join('')}
+    </select>
+    <button class="consider-btn" onclick="applyRealConsideration()">View</button>
+    <button class="consider-btn exit" onclick="exitRealConsideration()">Exit consideration mode</button>
+  </div>
+  <div id="realConsiderPanel"></div>`;
+}
+
+function applyRealConsideration(){
+  const considerId = document.getElementById('realConsiderSelect').value;
+  const container = document.getElementById('realGraphCanvas');
+  const node = container._fnodeSelection;
+  const panel = document.getElementById('realConsiderPanel');
+  if(!considerId){ exitRealConsideration(); return; }
+  const c = currentConsiderations.find(x => x.id === considerId);
+  const affectedIds = new Set(c.consideration_affected.map(a => a.target_qualified));
+  node.attr('class', d => {
+    if(d.id === c.source_qualified) return 'fnode source';
+    if(affectedIds.has(d.id)) return 'fnode considering';
+    return 'fnode dimmed';
+  });
+  const sorted = [...c.consideration_affected].sort((a,b)=>a.depth-b.depth);
+  panel.innerHTML = `<div class="consider-panel">
+    <div class="ctitle">What this touches — ${c.label}</div>
+    <div class="consider-item"><strong>Source of change:</strong> ${c.source_qualified}</div>
+    ${sorted.map(a=>`<div class="consider-item"><strong>${a.target_qualified}:</strong> ${a.note}</div>`).join('')}
+  </div>`;
+}
+
+function exitRealConsideration(){
+  const container = document.getElementById('realGraphCanvas');
+  if(container && container._fnodeSelection) container._fnodeSelection.attr('class', 'fnode');
+  const sel = document.getElementById('realConsiderSelect');
+  if(sel) sel.value = '';
+  const panel = document.getElementById('realConsiderPanel');
+  if(panel) panel.innerHTML = '';
+}
+
+let currentConsiderations = [];
+
+async function renderRealArchitectureMap(p){
+  const container = document.getElementById('singlePanelBody');
+  container.innerHTML = `<div class="loading-note">Loading architecture map…</div>`;
+  const [graph, considerations] = await Promise.all([fetchArchitectureGraph(p.id), fetchConsiderations(p.id)]);
+  if(!graph){
+    container.innerHTML = `<div class="map-canvas" style="height:420px;">${mapCanvasHTML(p)}</div><div class="map-footer">Not yet generated for this project.</div>`;
+    return;
+  }
+  currentConsiderations = considerations;
+  container.innerHTML = `${considerToggleRowHTML(considerations)}<div class="real-graph-canvas" id="realGraphCanvas"></div>${realGraphLegendHTML(graph.nodes)}<div class="real-graph-stats">Generated via code-review-graph · ${graph.snapshot.files_parsed} files, ${graph.nodes.length} file nodes, ${graph.edges.length} resolved internal imports · last run ${new Date(graph.snapshot.generated_at).toLocaleString()}</div>`;
+  renderForceGraph(document.getElementById('realGraphCanvas'), graph);
 }
 
 function architectureMapBodyHTML(p){
@@ -702,8 +866,9 @@ function openPanel(panel){
   if(panel==='sessionlog') body = sessionLogAddFormHTML(p) + sessionLogTableHTML(p);
   if(panel==='rubric') body = `<div class="trigger-note">Triggered on demand by saying "run the rubric" during a session on this project, not automatic detection.</div>` + rubricBodyHTML(p, true) + rubricEvolutionLogHTML(p);
   if(panel==='diary') body = diaryAddFormHTML(p) + diaryListHTML(p);
-  if(panel==='map') body = architectureMapBodyHTML(p);
+  if(panel==='map' && projectGraphs[p.id]) body = architectureMapBodyHTML(p);
   document.getElementById('singlePanelBody').innerHTML = body;
+  if(panel==='map' && !projectGraphs[p.id]) renderRealArchitectureMap(p);
 
   document.querySelector('.back-btn').textContent = '← Project overview';
   document.querySelector('.back-btn').onclick = backToOverview;

@@ -9,14 +9,30 @@ Per-project dashboard tool. Five modules sit inside each project (Session Log, B
 
 ## Structure
 
-- `index.html` — the Interface: Kanban/list/grid/gallery views of all projects, plus a per-project detail page with Session Log, Rubric, Build Diary, and Architecture Map panels (including the Consideration Mode demo, seeded on Bill Parser data).
+- `index.html` — the Interface: Kanban/list/grid/gallery views of all projects, plus a per-project detail page with Session Log, Rubric, Build Diary, and Architecture Map panels (including the Consideration Mode demo, seeded on Bill Parser data). Uses D3 (CDN) for the real Architecture Map force graph.
 - `assets/config.js` — Supabase URL and anon key used by the client.
-- `supabase/schema.sql` — schema for `projects`, `rubric_lenses`, `diary_entries`, `session_log_entries`, and `rubric_evolution_log` (RLS enabled, anon role granted full access since there's no auth layer).
+- `supabase/schema.sql` — schema for `projects`, `rubric_lenses`, `diary_entries`, `session_log_entries`, `rubric_evolution_log`, `architecture_nodes`, `architecture_edges`, `architecture_snapshots`, `considerations`, and `consideration_affected` (RLS enabled, anon role granted full access since there's no auth layer).
+- `scripts/import_architecture_graph.py` — one-off/rerunnable importer: runs `code-review-graph build` against a cloned project repo, reads its local SQLite graph, and loads File nodes plus resolved `IMPORTS_FROM` edges into Supabase for that project.
+- `scripts/log_consideration.py` — computes the blast radius of a proposed change (BFS over the stored `IMPORTS_FROM` edges, reversed) and logs it as a Consideration for the dashboard to display.
 
 ## Rubric
 
 Four-lens pre-push gate per project (functional outcome, downstream surface effects, structural integrity, UX efficacy), plus a rubric-evolution log recording every change made to a lens. It's triggered on demand, not by automatic detection: say "run the rubric" during a Claude Code session on a project to have the current diff checked against that project's lenses.
 
+## Architecture Map
+
+Generated via [code-review-graph](https://github.com/tirth8205/code-review-graph), which parses a repo with Tree-sitter into a local SQLite graph of nodes and edges (12 edge kinds total: CALLS, IMPORTS_FROM, INHERITS, IMPLEMENTS, CONTAINS, TESTED_BY, DEPENDS_ON, REFERENCES, INJECTS, CONSUMES, PRODUCES, TEMPORAL_STUB). Wayfinder imports only `File`/`Function`/`Class` nodes and resolved `IMPORTS_FROM` edges — that edge kind resolves reliably (internal file-to-file imports), whereas raw `CALLS` edges mostly point to unqualified names (React/hooks/npm calls, or false positives from non-JS files) and aren't reliable enough to key blast-radius logic off, so they're intentionally left out rather than building a fallback resolver for them.
+
+First real project run: `keyona-rerev/knowledge-loom-prismm` — 168 files parsed, 580 nodes (168 File, 396 Function, 16 Class), 652 `IMPORTS_FROM` edges (314 resolving to internal files, the rest to external packages). Bill Parser keeps its small hand-authored demo graph instead of a real one, since Bill Parser is client-critical infrastructure that's never a build/test subject.
+
+The dashboard renders the file-level import graph as a D3 force-directed layout (grouped/colored by top-level directory, pan/zoom, auto-fit once the simulation settles), fetched live from `architecture_nodes`/`architecture_edges` for whichever project has an `architecture_snapshots` row.
+
+## Consideration Mode
+
+Shows the blast radius of a proposed change by highlighting affected nodes on the Architecture Map: the changed file glows purple, everything that transitively imports it glows amber, everything else dims. Depends on Architecture Map already existing for a project.
+
+Considerations are logged by Claude during a session, not authored from the dashboard — Keyona can only pick one from a dropdown, view it, and exit, the same restriction the original Bill Parser demo models. `scripts/log_consideration.py --project-id <id> --file <path> --label "..."` walks the reversed `IMPORTS_FROM` graph already stored in Supabase from a changed file outward to find every direct and transitive importer, then writes a `considerations` row plus one `consideration_affected` row per affected file (each tagged with hop depth). The dashboard picks these up automatically the next time the Architecture Map panel is opened for that project.
+
 ## Status
 
-Interface, Session Log, Build Diary, and Rubric are live against real Supabase data. Remaining modules build out in order: Architecture Map, Consideration Mode.
+All five modules (Session Log, Build Diary, Rubric, Architecture Map, Consideration Mode) plus the Interface are live against real Supabase data.
