@@ -1,6 +1,6 @@
 # Wayfinder
 
-Per-project dashboard tool. Five modules sit inside each project (Session Log, Build Diary, Rubric, Architecture Map, Consideration Mode), plus a top-level Interface that lists all projects.
+Per-project dashboard tool. Seven modules sit inside each project (Session Log, Build Diary, Rubric, Architecture Map, Consideration Mode, Tech Stack, Deep Test), plus a top-level Interface that lists all projects.
 
 ## Kanban lifecycle
 
@@ -46,6 +46,18 @@ Shows the blast radius of a proposed change by highlighting affected nodes on th
 
 Considerations are logged by Claude during a session, not authored from the dashboard — Keyona can only pick one from a dropdown, view it, and exit. `scripts/log_consideration.py --project-id <id> --file <path> --label "..."` walks the reversed `IMPORTS_FROM` graph already stored in Supabase from a changed file outward to find every direct and transitive importer, then writes a `considerations` row plus one `consideration_affected` row per affected file (each tagged with hop depth). The dashboard picks these up automatically the next time the Architecture Map panel is opened for that project.
 
+## Tech Stack
+
+A per-project list of every service it depends on (Supabase, Railway, Netlify, GitHub, whatever applies), each row a direct link to that specific resource's dashboard, not just the service's homepage. This is a fact about the project, not a workflow state, so it's always visible, no gate. An "Add tech stack item" form on the full page lets new entries get logged without a direct Supabase write. Both real projects are seeded with their actual Supabase/Netlify/GitHub links.
+
+## Deep Test
+
+Rubric is the per-change gate run during active building. Deep Test is a full pass over every essential function in a build, run at a milestone, to answer "is this actually handoff-ready," not "did this one push break anything." A project only earns `Live` status once it's passed Deep Test.
+
+Each `deep_test_items` row pairs a function/behavior label with a specific test action and its expected outcome, plus a `pass`/`fail`/`untested` result. Where a project already has an Architecture Map, "Suggest items from Architecture Map" pre-fills candidates from `architecture_nodes` where the node kind is `Function` or `Class` (skipping any node already linked to an existing item via `source_node_id`), leaving `test_action`/`expected_outcome` blank for Keyona or a Claude session to fill in. Items can also always be added manually with no `source_node_id`, Architecture Map or not.
+
+"Start Deep Test Run" creates a `deep_test_runs` row and switches the full page to a guided one-item-at-a-time view instead of a flat list to eyeball, since reducing cognitive load at the end of a long build is the whole point. Passing or failing an item advances to the next one not yet tested since the run started (computed from `last_tested_at` vs the run's `started_at`, so it resumes correctly even after a page reload); the run's `completed_at` gets set the moment none are left. A "Deep Test in progress" pill shows on the project's card in every board view (any Kanban column, not gated to a status) whenever a `deep_test_runs` row has `completed_at IS NULL`.
+
 ## Status
 
-All five modules (Session Log, Build Diary, Rubric, Architecture Map, Consideration Mode) plus the Interface are live against real Supabase data. Board currently tracks two real projects: Knowledge Loom Prismm and Wayfinder itself. The mockup-only entries with no repo link and no Architecture Map (Bill Parser, Athlete-Site.com, Super Connector CRM, BTC Comms Review) were removed — new projects now come in through the "unmapped GitHub repos" panel instead.
+All seven modules (Session Log, Build Diary, Rubric, Architecture Map, Consideration Mode, Tech Stack, Deep Test) plus the Interface are live against real Supabase data. Board currently tracks two real projects: Knowledge Loom Prismm and Wayfinder itself. The mockup-only entries with no repo link and no Architecture Map (Bill Parser, Athlete-Site.com, Super Connector CRM, BTC Comms Review) were removed — new projects now come in through the "unmapped GitHub repos" panel instead.

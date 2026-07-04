@@ -93,9 +93,7 @@
   .back-btn{background:none;border:none;color:var(--cyan);font-family:'Inter';font-size:13px;font-weight:600;cursor:pointer;margin-bottom:18px;padding:0;display:flex;align-items:center;gap:6px;}
   .detail-head{display:flex;align-items:baseline;gap:14px;margin-bottom:22px;}
   .detail-head h2{margin:0;font-size:24px;}
-  .panels{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
-  @media(max-width:1400px){.panels{grid-template-columns:1fr 1fr;}}
-  @media(max-width:700px){.panels{grid-template-columns:1fr;}}
+  .panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;}
   .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;min-height:380px;display:flex;flex-direction:column;}
   .panel h3{font-size:14px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
   .panel .panel-sub{font-size:11.5px;color:var(--body);opacity:.7;margin-bottom:14px;}
@@ -104,6 +102,45 @@
   .pi-diary{background:var(--signal-spiral);}
   .pi-map{background:var(--cyan);}
   .pi-sessionlog{background:#4D9D6F;}
+  .pi-techstack{background:#E0A93D;}
+  .pi-deeptest{background:#3457C9;}
+
+  .tech-stack-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+  .tech-stack-row:last-child{border-bottom:none;}
+  .tech-stack-row:hover{background:#F6FBFB;}
+  .tech-stack-main{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .tech-stack-service{font-size:12.5px;font-weight:600;color:var(--primary);}
+  .tech-stack-resource{font-size:11.5px;opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tech-stack-arrow{color:var(--cyan);font-size:14px;flex-shrink:0;margin-left:8px;}
+
+  .deeptest-summary-counts{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+  .deeptest-count{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;}
+  .deeptest-count.pass{background:#E7F5EE;color:#2E7D52;}
+  .deeptest-count.fail{background:#FCEAE8;color:var(--signal-spiral);}
+  .deeptest-count.untested{background:#F0F3F5;color:var(--body);}
+  .deeptest-inprogress-note{font-size:11.5px;opacity:.7;font-style:italic;}
+  .deeptest-inprogress-pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:6px;background:#EAF0FC;color:#3457C9;}
+
+  .deeptest-item{padding:11px 0;border-bottom:1px solid var(--border);}
+  .deeptest-item:last-child{border-bottom:none;}
+  .deeptest-item-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;gap:8px;}
+  .deeptest-item-label{font-size:12.5px;font-weight:600;color:var(--primary);}
+  .deeptest-result-pill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;text-transform:capitalize;flex-shrink:0;}
+  .deeptest-result-pill.pass{background:#E7F5EE;color:#2E7D52;}
+  .deeptest-result-pill.fail{background:#FCEAE8;color:var(--signal-spiral);}
+  .deeptest-result-pill.untested{background:#F0F3F5;color:var(--body);}
+  .deeptest-item-field{font-size:12px;line-height:1.5;margin-bottom:3px;}
+  .deeptest-editable{cursor:pointer;border-bottom:1px dashed var(--border);}
+  .deeptest-editable:hover{color:var(--cyan);}
+  .deeptest-editable textarea{width:100%;font-family:'Inter';font-size:12px;border:1px solid var(--cyan);border-radius:6px;padding:6px;min-height:44px;margin-top:4px;}
+
+  .deeptest-runner{background:#F6FBFB;border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}
+  .deeptest-runner-progress{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--purple);margin-bottom:8px;}
+  .deeptest-runner-label{font-size:15px;font-weight:600;color:var(--primary);margin-bottom:10px;}
+  .deeptest-runner-row{font-size:12.5px;line-height:1.6;margin-bottom:6px;}
+  .deeptest-runner-actions{margin-top:12px;display:flex;gap:8px;}
+  .deeptest-pass-btn{background:#2E7D52;color:#fff;border:none;font-size:12px;font-weight:600;padding:8px 16px;border-radius:7px;cursor:pointer;}
+  .deeptest-fail-btn{background:var(--signal-spiral);color:#fff;border:none;font-size:12px;font-weight:600;padding:8px 16px;border-radius:7px;cursor:pointer;}
 
   .session-log-table td{vertical-align:top;}
   .session-log-table .session-link{color:var(--cyan);font-weight:600;text-decoration:none;font-size:12.5px;}
@@ -320,6 +357,26 @@
           <div class="map-canvas" id="mapCanvas"></div>
           <div class="map-footer" id="mapFooter"></div>
         </div>
+
+        <!-- TECH STACK -->
+        <div class="panel">
+          <div class="panel-head-row">
+            <h3><span class="panel-icon pi-techstack">T</span>Tech Stack</h3>
+            <button class="expand-btn" onclick="openPanel('techstack')">Open page ⤢</button>
+          </div>
+          <div class="panel-sub">Every service this project depends on, with a direct link to its dashboard</div>
+          <div id="techStackBody"></div>
+        </div>
+
+        <!-- DEEP TEST -->
+        <div class="panel">
+          <div class="panel-head-row">
+            <h3><span class="panel-icon pi-deeptest">D</span>Deep Test</h3>
+            <button class="expand-btn" onclick="openPanel('deeptest')">Open page ⤢</button>
+          </div>
+          <div class="panel-sub">Full pass over every essential function, run at a milestone</div>
+          <div id="deepTestBody"></div>
+        </div>
       </div>
 
       <!-- ===== Single full-page panel ===== -->
@@ -345,8 +402,8 @@ const restHeaders = {
 let projects = [];
 
 async function fetchProjects(){
-  const query = `select=*,rubric_lenses(name,description,lens_order),diary_entries(id,entry_date,signal,source,kind,author,body),session_log_entries(id,session_label,session_url,bullets),rubric_evolution_log(id,lens_name,old_description,new_description,changed_at),architecture_snapshots(generated_at)`
-    + `&rubric_lenses.order=lens_order.asc&diary_entries.order=id.desc&session_log_entries.order=id.desc&rubric_evolution_log.order=id.desc`;
+  const query = `select=*,rubric_lenses(name,description,lens_order),diary_entries(id,entry_date,signal,source,kind,author,body),session_log_entries(id,session_label,session_url,bullets),rubric_evolution_log(id,lens_name,old_description,new_description,changed_at),architecture_snapshots(generated_at),tech_stack_items(id,service_name,resource_label,link_url,notes),deep_test_items(id,function_label,source_node_id,test_action,expected_outcome,last_result,last_tested_at,notes),deep_test_runs(id,started_at,completed_at,pass_count,fail_count,total_count)`
+    + `&rubric_lenses.order=lens_order.asc&diary_entries.order=id.desc&session_log_entries.order=id.desc&rubric_evolution_log.order=id.desc&tech_stack_items.order=id.asc&deep_test_items.order=id.asc&deep_test_runs.order=id.desc`;
   const res = await fetch(`${REST}/projects?${query}`, {headers: restHeaders});
   const rows = await res.json();
   return rows.map(row => ({
@@ -358,7 +415,10 @@ async function fetchProjects(){
     rubric: (row.rubric_lenses || []).map(r => ({n: r.name, d: r.description})),
     diary: (row.diary_entries || []).map(d => ({date: d.entry_date, sig: d.signal, source: d.source, kind: d.kind, author: d.author, text: d.body})),
     sessionLog: (row.session_log_entries || []).map(s => ({label: s.session_label, url: s.session_url, bullets: s.bullets})),
-    rubricLog: (row.rubric_evolution_log || []).map(l => ({lensName: l.lens_name, oldDesc: l.old_description, newDesc: l.new_description, changedAt: new Date(l.changed_at).toLocaleDateString()}))
+    rubricLog: (row.rubric_evolution_log || []).map(l => ({lensName: l.lens_name, oldDesc: l.old_description, newDesc: l.new_description, changedAt: new Date(l.changed_at).toLocaleDateString()})),
+    techStack: (row.tech_stack_items || []).map(t => ({id: t.id, serviceName: t.service_name, resourceLabel: t.resource_label, linkUrl: t.link_url, notes: t.notes})),
+    deepTestItems: (row.deep_test_items || []).map(d => ({id: d.id, functionLabel: d.function_label, sourceNodeId: d.source_node_id, testAction: d.test_action, expectedOutcome: d.expected_outcome, lastResult: d.last_result, lastTestedAt: d.last_tested_at, notes: d.notes})),
+    deepTestRuns: (row.deep_test_runs || []).map(r => ({id: r.id, startedAt: r.started_at, completedAt: r.completed_at, passCount: r.pass_count, failCount: r.fail_count, totalCount: r.total_count}))
   }));
 }
 
@@ -587,6 +647,7 @@ function cardHTML(p){
     <h4>${p.name}</h4>
     <div class="meta">${signalPillHTML(p.signal)}<span>${p.lastActivity}</span></div>
     ${analysisPillHTML(p)}
+    ${hasInProgressDeepTestRun(p) ? `<div class="deeptest-inprogress-pill">Deep Test in progress</div>` : ''}
   </div>`;
 }
 
@@ -595,7 +656,7 @@ function renderList(){
   const tbody = document.querySelector('#view-list tbody');
   tbody.innerHTML = projects.map(p=>`
     <tr class="row" data-pid="${p.id}">
-      <td class="pname">${p.name}${showsAnalysisStatus(p) ? ` ${analysisPillHTML(p)}` : ''}</td>
+      <td class="pname">${p.name}${showsAnalysisStatus(p) ? ` ${analysisPillHTML(p)}` : ''}${hasInProgressDeepTestRun(p) ? ` <span class="deeptest-inprogress-pill">Deep Test in progress</span>` : ''}</td>
       <td>${p.venture}</td>
       <td><span class="status-chip ${p.status}">${p.status}</span></td>
       <td>${signalPillHTML(p.signal)}</td>
@@ -794,6 +855,220 @@ function mapCanvasHTML(p){
   return thumbSVG(p.map).replace('width="300" height="120"','width="100%" height="100%" preserveAspectRatio="xMidYMid meet"');
 }
 
+function techStackListHTML(p){
+  if(!p.techStack.length) return `<div class="empty-note">No tech stack items logged yet for this project.</div>`;
+  return p.techStack.map(t => `
+    <div class="tech-stack-row" onclick="window.open('${t.linkUrl}', '_blank', 'noopener')">
+      <div class="tech-stack-main">
+        <span class="tech-stack-service">${t.serviceName}</span>
+        <span class="tech-stack-resource">${t.resourceLabel}</span>
+      </div>
+      <span class="tech-stack-arrow">→</span>
+    </div>`).join('');
+}
+function techStackAddFormHTML(p){
+  return `<div class="diary-add">
+    <input id="techServiceInput" placeholder="Service (e.g. Supabase, Railway, Netlify)" style="width:100%;font-family:'Inter';font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;margin-bottom:8px;">
+    <input id="techResourceInput" placeholder="Resource / instance name (e.g. project ref or site name)" style="width:100%;font-family:'Inter';font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;margin-bottom:8px;">
+    <input id="techLinkInput" placeholder="Direct link to that resource's dashboard" style="width:100%;font-family:'Inter';font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;margin-bottom:8px;">
+    <button onclick="addTechStackItem('${p.id}')">Add tech stack item</button>
+  </div>`;
+}
+async function addTechStackItem(pid){
+  const serviceName = document.getElementById('techServiceInput').value.trim();
+  const resourceLabel = document.getElementById('techResourceInput').value.trim();
+  const linkUrl = document.getElementById('techLinkInput').value.trim();
+  if(!serviceName || !linkUrl) return;
+  const p = projects.find(x => x.id === pid);
+
+  const res = await fetch(`${REST}/tech_stack_items`, {
+    method: 'POST', headers: {...restHeaders, Prefer: 'return=representation'},
+    body: JSON.stringify({project_id: pid, service_name: serviceName, resource_label: resourceLabel, link_url: linkUrl})
+  });
+  const [row] = await res.json();
+  p.techStack.push({id: row.id, serviceName, resourceLabel, linkUrl, notes: null});
+  openPanel('techstack');
+}
+
+// ---- Deep Test ----
+function deepTestSummary(p){
+  const total = p.deepTestItems.length;
+  const pass = p.deepTestItems.filter(i => i.lastResult === 'pass').length;
+  const fail = p.deepTestItems.filter(i => i.lastResult === 'fail').length;
+  return {total, pass, fail, untested: total - pass - fail};
+}
+function hasInProgressDeepTestRun(p){
+  return p.deepTestRuns.length > 0 && !p.deepTestRuns[0].completedAt;
+}
+function deepTestItemsPendingForRun(p, run){
+  return p.deepTestItems.filter(i => !i.lastTestedAt || new Date(i.lastTestedAt) < new Date(run.startedAt));
+}
+
+function deepTestPreviewHTML(p){
+  if(!p.deepTestItems.length) return `<div class="empty-note">No Deep Test items yet for this project.</div>`;
+  const {pass, fail, untested} = deepTestSummary(p);
+  return `<div class="deeptest-summary">
+    <div class="deeptest-summary-counts">
+      <span class="deeptest-count pass">${pass} pass</span>
+      <span class="deeptest-count fail">${fail} fail</span>
+      <span class="deeptest-count untested">${untested} untested</span>
+    </div>
+    ${hasInProgressDeepTestRun(p) ? `<div class="deeptest-inprogress-note">Deep Test run in progress…</div>` : ''}
+  </div>`;
+}
+
+function deepTestLastRunSummaryHTML(p){
+  const run = p.deepTestRuns[0];
+  if(!run || !run.completedAt) return '';
+  return `<div class="empty-note" style="margin-bottom:12px;">Last run: ${run.passCount} pass, ${run.failCount} fail out of ${run.totalCount}, completed ${new Date(run.completedAt).toLocaleString()}.</div>`;
+}
+
+function deepTestListHTML(p){
+  if(!p.deepTestItems.length) return `<div class="empty-note">No Deep Test items yet for this project.</div>`;
+  return p.deepTestItems.map(item => `
+    <div class="deeptest-item">
+      <div class="deeptest-item-head">
+        <span class="deeptest-item-label">${item.functionLabel}</span>
+        <span class="deeptest-result-pill ${item.lastResult}">${item.lastResult}</span>
+      </div>
+      <div class="deeptest-item-field"><strong>Test:</strong> <span class="deeptest-editable" id="deeptest-test_action-${item.id}" onclick="editDeepTestField('${p.id}', ${item.id}, 'test_action')">${item.testAction || '<em>Click to add a test action</em>'}</span></div>
+      <div class="deeptest-item-field"><strong>Expected:</strong> <span class="deeptest-editable" id="deeptest-expected_outcome-${item.id}" onclick="editDeepTestField('${p.id}', ${item.id}, 'expected_outcome')">${item.expectedOutcome || '<em>Click to add an expected outcome</em>'}</span></div>
+    </div>`).join('');
+}
+
+function editDeepTestField(pid, itemId, field){
+  const p = projects.find(x => x.id === pid);
+  const item = p.deepTestItems.find(i => i.id === itemId);
+  const current = field === 'test_action' ? item.testAction : item.expectedOutcome;
+  const el = document.getElementById(`deeptest-${field}-${itemId}`);
+  el.outerHTML = `<span id="deeptest-${field}-${itemId}"><textarea id="deeptest-input-${field}-${itemId}">${current || ''}</textarea><div class="goal-save-row"><button onclick="saveDeepTestField('${pid}', ${itemId}, '${field}')">Save</button></div></span>`;
+}
+async function saveDeepTestField(pid, itemId, field){
+  const p = projects.find(x => x.id === pid);
+  const item = p.deepTestItems.find(i => i.id === itemId);
+  const value = document.getElementById(`deeptest-input-${field}-${itemId}`).value.trim();
+  if(field === 'test_action') item.testAction = value; else item.expectedOutcome = value;
+  openPanel('deeptest');
+  await fetch(`${REST}/deep_test_items?id=eq.${itemId}`, {
+    method: 'PATCH', headers: {...restHeaders, Prefer: 'return=minimal'},
+    body: JSON.stringify({[field]: value})
+  });
+}
+
+function deepTestAddFormHTML(p){
+  return `<div class="diary-add">
+    <input id="deepTestLabelInput" placeholder="Function/behavior label (e.g. Loom Cue email hook)" style="width:100%;font-family:'Inter';font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;margin-bottom:8px;">
+    <textarea id="deepTestActionInput" placeholder="Test action: the specific thing to do..." style="margin-bottom:8px;"></textarea>
+    <textarea id="deepTestExpectedInput" placeholder="Expected outcome: what should happen..." style="margin-bottom:8px;"></textarea>
+    <button onclick="addDeepTestItem('${p.id}')">Add item</button>
+  </div>`;
+}
+async function addDeepTestItem(pid){
+  const label = document.getElementById('deepTestLabelInput').value.trim();
+  const action = document.getElementById('deepTestActionInput').value.trim();
+  const expected = document.getElementById('deepTestExpectedInput').value.trim();
+  if(!label) return;
+  const p = projects.find(x => x.id === pid);
+  const res = await fetch(`${REST}/deep_test_items`, {
+    method: 'POST', headers: {...restHeaders, Prefer: 'return=representation'},
+    body: JSON.stringify({project_id: pid, function_label: label, test_action: action, expected_outcome: expected})
+  });
+  const [row] = await res.json();
+  p.deepTestItems.push({id: row.id, functionLabel: label, sourceNodeId: null, testAction: action, expectedOutcome: expected, lastResult: 'untested', lastTestedAt: null, notes: null});
+  openPanel('deeptest');
+}
+
+async function suggestDeepTestItems(pid){
+  const res = await fetch(`${REST}/architecture_nodes?project_id=eq.${pid}&kind=in.(Function,Class)&select=id,name`, {headers: restHeaders});
+  const nodes = await res.json();
+  const p = projects.find(x => x.id === pid);
+  const existingSourceIds = new Set(p.deepTestItems.map(i => i.sourceNodeId).filter(Boolean));
+  const toAdd = nodes.filter(n => !existingSourceIds.has(n.id));
+  if(!toAdd.length){ openPanel('deeptest'); return; }
+
+  const rows = toAdd.map(n => ({project_id: pid, function_label: n.name, source_node_id: n.id, test_action: '', expected_outcome: ''}));
+  const res2 = await fetch(`${REST}/deep_test_items`, {
+    method: 'POST', headers: {...restHeaders, Prefer: 'return=representation'},
+    body: JSON.stringify(rows)
+  });
+  const inserted = await res2.json();
+  p.deepTestItems.push(...inserted.map(row => ({
+    id: row.id, functionLabel: row.function_label, sourceNodeId: row.source_node_id,
+    testAction: row.test_action, expectedOutcome: row.expected_outcome,
+    lastResult: row.last_result, lastTestedAt: row.last_tested_at, notes: row.notes
+  })));
+  openPanel('deeptest');
+}
+
+async function startDeepTestRun(pid){
+  const p = projects.find(x => x.id === pid);
+  if(!p.deepTestItems.length) return;
+  const startedAt = new Date().toISOString();
+  const res = await fetch(`${REST}/deep_test_runs`, {
+    method: 'POST', headers: {...restHeaders, Prefer: 'return=representation'},
+    body: JSON.stringify({project_id: pid, started_at: startedAt, pass_count: 0, fail_count: 0, total_count: p.deepTestItems.length})
+  });
+  const [row] = await res.json();
+  p.deepTestRuns.unshift({id: row.id, startedAt, completedAt: null, passCount: 0, failCount: 0, totalCount: p.deepTestItems.length});
+  renderKanban(); renderList(); renderGrid(); renderGallery();
+  openPanel('deeptest');
+}
+
+async function recordDeepTestResult(pid, runId, itemId, result){
+  const p = projects.find(x => x.id === pid);
+  const run = p.deepTestRuns.find(r => r.id === runId);
+  const item = p.deepTestItems.find(i => i.id === itemId);
+  const testedAt = new Date().toISOString();
+  item.lastResult = result;
+  item.lastTestedAt = testedAt;
+  if(result === 'pass') run.passCount++; else run.failCount++;
+  if(deepTestItemsPendingForRun(p, run).length === 0) run.completedAt = testedAt;
+
+  openPanel('deeptest');
+  renderKanban(); renderList(); renderGrid(); renderGallery();
+
+  await fetch(`${REST}/deep_test_items?id=eq.${itemId}`, {
+    method: 'PATCH', headers: {...restHeaders, Prefer: 'return=minimal'},
+    body: JSON.stringify({last_result: result, last_tested_at: testedAt})
+  });
+  await fetch(`${REST}/deep_test_runs?id=eq.${runId}`, {
+    method: 'PATCH', headers: {...restHeaders, Prefer: 'return=minimal'},
+    body: JSON.stringify({pass_count: run.passCount, fail_count: run.failCount, completed_at: run.completedAt || null})
+  });
+}
+
+function deepTestRunnerHTML(p, run){
+  const pending = deepTestItemsPendingForRun(p, run);
+  const item = pending[0];
+  const doneCount = run.totalCount - pending.length;
+  return `<div class="deeptest-runner">
+    <div class="deeptest-runner-progress">Item ${doneCount + 1} of ${run.totalCount}</div>
+    <div class="deeptest-runner-label">${item.functionLabel}</div>
+    <div class="deeptest-runner-row"><strong>Test:</strong> <span class="deeptest-editable" id="deeptest-test_action-${item.id}" onclick="editDeepTestField('${p.id}', ${item.id}, 'test_action')">${item.testAction || '<em>Click to add a test action</em>'}</span></div>
+    <div class="deeptest-runner-row"><strong>Expected:</strong> <span class="deeptest-editable" id="deeptest-expected_outcome-${item.id}" onclick="editDeepTestField('${p.id}', ${item.id}, 'expected_outcome')">${item.expectedOutcome || '<em>Click to add an expected outcome</em>'}</span></div>
+    <div class="deeptest-runner-actions">
+      <button class="deeptest-pass-btn" onclick="recordDeepTestResult('${p.id}', ${run.id}, ${item.id}, 'pass')">Pass</button>
+      <button class="deeptest-fail-btn" onclick="recordDeepTestResult('${p.id}', ${run.id}, ${item.id}, 'fail')">Fail</button>
+    </div>
+  </div>`;
+}
+
+function deepTestFullPageHTML(p){
+  const activeRun = p.deepTestRuns.find(r => !r.completedAt);
+  if(activeRun) return deepTestRunnerHTML(p, activeRun);
+
+  let html = deepTestLastRunSummaryHTML(p);
+  if(!p.hasArchitectureMap){
+    html += `<div class="empty-note" style="margin-bottom:12px;">No Architecture Map yet for this project, so items can only be added manually below, no auto-suggest from Function/Class nodes until one exists.</div>`;
+  } else {
+    html += `<div style="margin-bottom:14px;"><button class="consider-btn" onclick="suggestDeepTestItems('${p.id}')">Suggest items from Architecture Map</button></div>`;
+  }
+  html += `<div style="margin-bottom:14px;"><button class="consider-btn" onclick="startDeepTestRun('${p.id}')"${p.deepTestItems.length ? '' : ' disabled'}>Start Deep Test Run</button></div>`;
+  html += deepTestAddFormHTML(p);
+  html += deepTestListHTML(p);
+  return html;
+}
+
 // ---- State ----
 let currentProjectId = null;
 let currentPanelView = null; // null | 'rubric' | 'diary' | 'map'
@@ -866,6 +1141,8 @@ function openDetail(pid){
   document.getElementById('diaryBody').innerHTML = diaryListHTML(p);
   document.getElementById('mapCanvas').innerHTML = mapCanvasHTML(p);
   document.getElementById('mapFooter').textContent = p.hasArchitectureMap ? ('Generated on demand · last run ' + p.lastActivity) : 'Not yet generated for this project.';
+  document.getElementById('techStackBody').innerHTML = techStackListHTML(p);
+  document.getElementById('deepTestBody').innerHTML = deepTestPreviewHTML(p);
 
   document.querySelector('.back-btn').textContent = '← All projects';
   document.querySelector('.back-btn').onclick = closeDetail;
@@ -881,7 +1158,9 @@ function openPanel(panel){
     sessionlog: ['<span class="panel-icon pi-sessionlog">S</span>Session Log', 'Purely a click-back trail: a link to the conversation, plus a few bullets on what happened'],
     rubric: ['<span class="panel-icon pi-rubric">R</span>Rubric', 'Goal, then the gate this project\'s changes are checked against before push'],
     diary: ['<span class="panel-icon pi-diary">D</span>Build Diary', 'Log a new signal directly, or review everything logged so far'],
-    map: ['<span class="panel-icon pi-map">M</span>Architecture Map', 'Full snapshot of structure and relationships, generated on demand. Consideration runs logged by Claude show what a proposed change would touch.']
+    map: ['<span class="panel-icon pi-map">M</span>Architecture Map', 'Full snapshot of structure and relationships, generated on demand. Consideration runs logged by Claude show what a proposed change would touch.'],
+    techstack: ['<span class="panel-icon pi-techstack">T</span>Tech Stack', 'Every service this project depends on, with a direct link to its dashboard'],
+    deeptest: ['<span class="panel-icon pi-deeptest">D</span>Deep Test', 'A full pass over every essential function, run at a milestone, to confirm this is handoff-ready']
   };
   document.getElementById('singlePanelTitle').innerHTML = titles[panel][0];
   document.getElementById('singlePanelSub').textContent = titles[panel][1];
@@ -890,6 +1169,8 @@ function openPanel(panel){
   if(panel==='sessionlog') body = sessionLogAddFormHTML(p) + sessionLogTableHTML(p);
   if(panel==='rubric') body = `<div class="trigger-note">Triggered on demand by saying "run the rubric" during a session on this project, not automatic detection.</div>` + rubricBodyHTML(p, true) + rubricEvolutionLogHTML(p);
   if(panel==='diary') body = diaryAddFormHTML(p) + diaryListHTML(p);
+  if(panel==='techstack') body = techStackAddFormHTML(p) + techStackListHTML(p);
+  if(panel==='deeptest') body = deepTestFullPageHTML(p);
   document.getElementById('singlePanelBody').innerHTML = body;
   if(panel==='map') renderRealArchitectureMap(p);
 
