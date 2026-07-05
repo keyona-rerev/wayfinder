@@ -20,9 +20,18 @@ Four columns: **Building** (actively under construction, not yet usable), **Live
 - `scripts/log_consideration.py` — computes the blast radius of a proposed change (BFS over the stored `IMPORTS_FROM` edges, reversed) and logs it as a Consideration for the dashboard to display.
 - `scripts/sync_github_repos.py` — syncs the full GitHub repo list into `github_repos`, so the Interface can show which repos aren't a Wayfinder project yet.
 
-## Unmapped GitHub repos
+## Main board is gated on analysis, not existence
 
-Its own page, reached via the repo icon in the left rail (a badge on the icon shows the current unmapped count), not a panel bolted onto the board. It lists every synced repo (`github_repos`) that no `projects` row points to via `repo_full_name`, with the same List/Grid/Gallery view-mode switcher as the main board. Clicking "+ Add to Wayfinder" on one (from any of the three views) creates a real `projects` row on the spot (id slugified from the repo name, goal pre-filled from the repo description if it has one, a default 4-lens rubric scaffold, `status: Building`, `venture: Unassigned`, `analysis_status: queued`) so it shows up on the board immediately, drops off the unmapped-repos page, and opens straight to that new project's detail page. This only creates the metadata shell — Architecture Map/Consideration Mode still need a deliberate follow-up run (`import_architecture_graph.py`, then `log_consideration.py`) against that repo, same as Knowledge Loom Prismm.
+The Kanban/List/Grid/Gallery board only queries and displays projects where `projects.analysis_status = 'complete'`. A `projects` row existing is not enough to earn a spot on the board — a project has to have actually been through Architecture Map analysis first. Everything else, regardless of why it isn't complete yet (never queued, queued, running, or failed), simply does not appear on the board in any view mode.
+
+## Awaiting Analysis
+
+Its own page, reached via the repo icon in the left rail (a badge on the icon shows the current combined count), not a panel bolted onto the board. It merges two categories into one flat list, with the same List/Grid/Gallery view-mode switcher as the main board:
+
+1. **Existing projects not yet analysis-complete.** Every project row where `analysis_status` isn't `complete` lands here automatically, tagged "Awaiting analysis." This includes projects with no repo at all (GAS-bound scripts, Google Sheet systems) — they aren't exempt from the gate and don't get a special "N/A" treatment, they just wait here like anything else until an analyzer exists for non-repo tools (a separate future build item, not yet started).
+2. **GitHub repos with no project row at all.** The original "unmapped repos" meaning, tagged "No repo yet." Clicking "+ Add to Wayfinder" on one (from any of the three views) creates a real `projects` row on the spot (id slugified from the repo name, goal pre-filled from the repo description if it has one, a default 4-lens rubric scaffold, `status: Building`, `venture: Unassigned`, `analysis_status: queued`), which immediately reclassifies it into category 1 above and opens straight to its new detail page. This only creates the metadata shell — Architecture Map/Consideration Mode still need a deliberate follow-up run (`import_architecture_graph.py`, then `log_consideration.py`) against that repo, same as Knowledge Loom Prismm.
+
+A project moves from Awaiting Analysis onto the main board the moment `analysis_status` flips to `complete`, no separate step: both views query the same field, so running `import_architecture_graph.py` against a project is what actually promotes it.
 
 ### Analysis status
 
@@ -60,4 +69,4 @@ Each `deep_test_items` row pairs a function/behavior label with a specific test 
 
 ## Status
 
-All seven modules (Session Log, Build Diary, Rubric, Architecture Map, Consideration Mode, Tech Stack, Deep Test) plus the Interface are live against real Supabase data. Board currently tracks two real projects: Knowledge Loom Prismm and Wayfinder itself. The mockup-only entries with no repo link and no Architecture Map (Bill Parser, Athlete-Site.com, Super Connector CRM, BTC Comms Review) were removed — new projects now come in through the "unmapped GitHub repos" panel instead.
+All seven modules (Session Log, Build Diary, Rubric, Architecture Map, Consideration Mode, Tech Stack, Deep Test) plus the Interface are live against real Supabase data. The main board is gated on `analysis_status = 'complete'`, so it currently shows exactly two projects, Knowledge Loom Prismm and Wayfinder itself, both real Architecture Map runs. `projects` holds 34 rows total: those two, plus 32 migrated from Keyona's retired Tool Registry Google Sheet, all currently sitting in Awaiting Analysis until an Architecture Map run (or, for the roughly 18 with no repo, a future non-repo analyzer) completes for them.

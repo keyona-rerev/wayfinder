@@ -256,6 +256,12 @@
   .repo-gcard .thumb svg{width:100%;height:100%;}
   .repo-gcard .gbody{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;}
   .repo-empty{padding:40px;text-align:center;opacity:.6;font-size:13px;}
+  .awaiting-tag{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;}
+  .awaiting-tag-norepo{background:#F0F3F5;color:var(--body);}
+  .awaiting-tag-analyzing{background:#FBF1DD;color:#A47620;}
+  .awaiting-row-project{cursor:pointer;}
+  .awaiting-row-project:hover{background:#F6FBFB;}
+  .awaiting-card-project{cursor:pointer;}
 
   .analysis-pending-pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:6px;}
 
@@ -276,9 +282,9 @@
 <div class="shell">
   <div class="rail">
     <div class="logo" onclick="showBoard()" title="Wayfinder board" style="cursor:pointer;"></div>
-    <button class="rail-icon" id="railReposBtn" title="Unmapped GitHub repos" onclick="openReposPage()">
+    <button class="rail-icon" id="railAwaitingBtn" title="Awaiting Analysis" onclick="openAwaitingPage()">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M9 21v-6h6v6"/></svg>
-      <span class="rail-icon-badge" id="railReposBadge"></span>
+      <span class="rail-icon-badge" id="railAwaitingBadge"></span>
     </button>
   </div>
 
@@ -314,27 +320,27 @@
 
     </div>
 
-    <!-- ===== Unmapped GitHub repos page ===== -->
-    <div class="board-wrap hidden" id="reposWrap">
+    <!-- ===== Awaiting Analysis page ===== -->
+    <div class="board-wrap hidden" id="awaitingWrap">
       <button class="back-btn" onclick="showBoard()">← Board</button>
       <div class="topbar" style="padding-top:0;">
         <div>
-          <h1>Unmapped GitHub repos</h1>
-          <div class="sub">Every synced repo not yet mapped to a Wayfinder project</div>
+          <h1>Awaiting Analysis</h1>
+          <div class="sub">Projects not yet analysis-complete, plus synced repos with no project yet</div>
         </div>
-        <div class="view-switch" id="reposViewSwitch">
-          <button class="active" data-reposview="list">List</button>
-          <button data-reposview="grid">Grid</button>
-          <button data-reposview="gallery">Gallery</button>
+        <div class="view-switch" id="awaitingViewSwitch">
+          <button class="active" data-awaitingview="list">List</button>
+          <button data-awaitingview="grid">Grid</button>
+          <button data-awaitingview="gallery">Gallery</button>
         </div>
       </div>
       <div style="padding:22px 0 0;">
-        <table id="repos-view-list" class="list-table">
-          <thead><tr><th>Repo</th><th>Description</th><th>Language</th><th>Visibility</th><th>Last pushed</th><th></th></tr></thead>
+        <table id="awaiting-view-list" class="list-table">
+          <thead><tr><th>Item</th><th>Context</th><th>Status</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
-        <div id="repos-view-grid" class="grid-wrap" style="display:none;"></div>
-        <div id="repos-view-gallery" class="gallery-wrap" style="display:none;"></div>
+        <div id="awaiting-view-grid" class="grid-wrap" style="display:none;"></div>
+        <div id="awaiting-view-gallery" class="gallery-wrap" style="display:none;"></div>
       </div>
     </div>
 
@@ -611,16 +617,21 @@ function signalPillHTML(sig){
 }
 
 // ---- Kanban ----
+function completeProjects(){
+  return projects.filter(p => p.analysisStatus === 'complete');
+}
+
 function renderKanban(){
   const el = document.getElementById('view-kanban');
+  const board = completeProjects();
   el.innerHTML = statusOrder.map(s=>{
-    const items = projects.filter(p=>p.status===s);
+    const items = board.filter(p=>p.status===s);
     return `<div class="kanban-col ${statusClass[s]}">
       <h3><span class="dot"></span>${s} (${items.length})</h3>
       ${items.map(p=>cardHTML(p)).join('')}
     </div>`;
   }).join('');
-  el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
+  el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetailFromBoard(c.dataset.pid));
 }
 function elapsedText(isoString){
   if(!isoString) return '';
@@ -685,7 +696,7 @@ function cardHTML(p){
 // ---- List ----
 function renderList(){
   const tbody = document.querySelector('#view-list tbody');
-  tbody.innerHTML = projects.map(p=>`
+  tbody.innerHTML = completeProjects().map(p=>`
     <tr class="row" data-pid="${p.id}">
       <td class="pname">${p.name}${showsAnalysisStatus(p) ? ` ${analysisPillHTML(p)}` : ''}${hasInProgressDeepTestRun(p) ? ` <span class="deeptest-inprogress-pill">Deep Test in progress</span>` : ''}</td>
       <td>${p.venture}</td>
@@ -693,14 +704,14 @@ function renderList(){
       <td>${signalPillHTML(p.signal)}</td>
       <td>${p.lastActivity}</td>
     </tr>`).join('');
-  tbody.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
+  tbody.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetailFromBoard(c.dataset.pid));
 }
 
 // ---- Grid ----
 function renderGrid(){
   const el = document.getElementById('view-grid');
-  el.innerHTML = projects.map(p=>cardHTML(p)).join('');
-  el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
+  el.innerHTML = completeProjects().map(p=>cardHTML(p)).join('');
+  el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetailFromBoard(c.dataset.pid));
 }
 
 // ---- Gallery ----
@@ -724,7 +735,7 @@ function thumbSVG(type){
 }
 function renderGallery(){
   const el = document.getElementById('view-gallery');
-  el.innerHTML = projects.map(p=>`
+  el.innerHTML = completeProjects().map(p=>`
     <div class="gcard" data-pid="${p.id}">
       <div class="thumb">${thumbSVG(p.map)}</div>
       <div class="gbody">
@@ -735,7 +746,7 @@ function renderGallery(){
         </div>
       </div>
     </div>`).join('');
-  el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetail(c.dataset.pid));
+  el.querySelectorAll('[data-pid]').forEach(c=>c.onclick=()=>openDetailFromBoard(c.dataset.pid));
 }
 
 // ---- View switching ----
@@ -749,12 +760,12 @@ document.querySelectorAll('#boardWrap .view-switch button').forEach(btn=>{
   };
 });
 
-document.querySelectorAll('#reposWrap .view-switch button').forEach(btn=>{
+document.querySelectorAll('#awaitingWrap .view-switch button').forEach(btn=>{
   btn.onclick = ()=>{
-    document.querySelectorAll('#reposWrap .view-switch button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('#awaitingWrap .view-switch button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     ['list','grid','gallery'].forEach(v=>{
-      document.getElementById('repos-view-'+v).style.display = (v===btn.dataset.reposview) ? (v==='list'?'table':'grid') : 'none';
+      document.getElementById('awaiting-view-'+v).style.display = (v===btn.dataset.awaitingview) ? (v==='list'?'table':'grid') : 'none';
     });
   };
 });
@@ -1113,6 +1124,7 @@ function deepTestFullPageHTML(p){
 // ---- State ----
 let currentProjectId = null;
 let currentPanelView = null; // null | 'rubric' | 'diary' | 'map'
+let returnToAwaiting = false; // whether the detail view was opened from the Awaiting Analysis page
 let statusPollInterval = null;
 let elapsedTickInterval = null;
 let pollingProjectId = null;
@@ -1158,8 +1170,19 @@ function startStatusPollingIfNeeded(pid){
     proj.hasArchitectureMap = !!(row.architecture_snapshots && row.architecture_snapshots.length);
     if(currentProjectId === pollingProjectId) renderAnalysisBanner(pollingProjectId);
     renderKanban(); renderList(); renderGrid(); renderGallery();
+    renderAwaitingPage();
     if(proj.analysisStatus === 'complete' || proj.analysisStatus === 'failed') stopStatusPolling();
   }, 5000);
+}
+
+function openDetailFromBoard(pid){
+  returnToAwaiting = false;
+  openDetail(pid);
+}
+
+function openDetailFromAwaiting(pid){
+  returnToAwaiting = true;
+  openDetail(pid);
 }
 
 function openDetail(pid){
@@ -1167,8 +1190,8 @@ function openDetail(pid){
   currentPanelView = null;
   const p = projects.find(x=>x.id===pid);
   document.getElementById('boardWrap').classList.add('hidden');
-  document.getElementById('reposWrap').classList.add('hidden');
-  document.getElementById('railReposBtn').classList.remove('active');
+  document.getElementById('awaitingWrap').classList.add('hidden');
+  document.getElementById('railAwaitingBtn').classList.remove('active');
   document.getElementById('detailView').classList.add('open');
   document.getElementById('panelsOverview').classList.remove('hidden');
   document.getElementById('singlePanel').classList.remove('open');
@@ -1226,6 +1249,11 @@ function backToOverview(){
 }
 
 function closeDetail(){
+  if(returnToAwaiting){
+    returnToAwaiting = false;
+    openAwaitingPage();
+    return;
+  }
   showBoard();
 }
 
@@ -1234,21 +1262,21 @@ function showBoard(){
   currentProjectId = null;
   currentPanelView = null;
   document.getElementById('detailView').classList.remove('open');
-  document.getElementById('reposWrap').classList.add('hidden');
-  document.getElementById('railReposBtn').classList.remove('active');
+  document.getElementById('awaitingWrap').classList.add('hidden');
+  document.getElementById('railAwaitingBtn').classList.remove('active');
   document.getElementById('boardWrap').classList.remove('hidden');
   renderKanban(); renderList(); renderGrid(); renderGallery();
 }
 
-function openReposPage(){
+function openAwaitingPage(){
   stopStatusPolling();
   currentProjectId = null;
   currentPanelView = null;
   document.getElementById('detailView').classList.remove('open');
   document.getElementById('boardWrap').classList.add('hidden');
-  document.getElementById('reposWrap').classList.remove('hidden');
-  document.getElementById('railReposBtn').classList.add('active');
-  renderReposPage();
+  document.getElementById('awaitingWrap').classList.remove('hidden');
+  document.getElementById('railAwaitingBtn').classList.add('active');
+  renderAwaitingPage();
 }
 
 function editGoal(pid){
@@ -1303,6 +1331,17 @@ function unmappedRepos(){
   return githubRepos.filter(r => !mapped.has(r.full_name));
 }
 
+function incompleteProjects(){
+  return projects.filter(p => p.analysisStatus !== 'complete');
+}
+
+function awaitingAnalysisItems(){
+  return [
+    ...incompleteProjects().map(p => ({kind: 'project', p})),
+    ...unmappedRepos().map(r => ({kind: 'repo', r})),
+  ];
+}
+
 function repoAddButtonHTML(fullName){
   return `<button class="repo-add-btn" onclick="addRepoAsProject('${fullName}')">+ Add to Wayfinder</button>`;
 }
@@ -1318,63 +1357,94 @@ function repoThumbSVG(name){
   return `<svg viewBox="0 0 300 120"><rect x="0" y="0" width="300" height="120" fill="#0D1F2D"/><rect x="0" y="0" width="300" height="120" fill="${color}" opacity="0.18"/><text x="150" y="70" font-size="40" font-family="Outfit,sans-serif" font-weight="600" fill="${color}" text-anchor="middle">${initials}</text></svg>`;
 }
 
-function renderReposList(){
-  const tbody = document.querySelector('#repos-view-list tbody');
-  const unmapped = unmappedRepos();
-  if(!unmapped.length){
-    tbody.innerHTML = `<tr><td colspan="6" class="repo-empty">Every synced repo is mapped to a project.</td></tr>`;
+function awaitingTagHTML(kind){
+  return kind === 'repo'
+    ? `<span class="awaiting-tag awaiting-tag-norepo">No repo yet</span>`
+    : `<span class="awaiting-tag awaiting-tag-analyzing">Awaiting analysis</span>`;
+}
+
+function analysisStatusLabel(status){
+  const labels = {not_requested: 'Not requested', queued: 'Queued', running: 'Analyzing…', failed: 'Failed'};
+  return labels[status] || status;
+}
+
+function renderAwaitingList(){
+  const tbody = document.querySelector('#awaiting-view-list tbody');
+  const items = awaitingAnalysisItems();
+  if(!items.length){
+    tbody.innerHTML = `<tr><td colspan="4" class="repo-empty">Nothing awaiting analysis right now.</td></tr>`;
     return;
   }
-  tbody.innerHTML = unmapped.map(r => `
-    <tr data-repo="${r.full_name}">
-      <td class="pname"><a class="repo-table-link" href="${r.html_url}" target="_blank" rel="noopener">${r.name}</a></td>
-      <td>${r.description || ''}</td>
-      <td>${r.language || ''}</td>
-      <td>${r.private ? 'Private' : 'Public'}</td>
-      <td>${r.pushed_at ? new Date(r.pushed_at).toLocaleDateString() : ''}</td>
-      <td>${repoAddButtonHTML(r.full_name)}</td>
+  tbody.innerHTML = items.map(item => item.kind === 'project' ? `
+    <tr class="awaiting-row-project" data-pid="${item.p.id}">
+      <td class="pname">${item.p.name}${awaitingTagHTML('project')}</td>
+      <td>${item.p.venture}${item.p.repoFullName ? ` · <code>${item.p.repoFullName}</code>` : ''}</td>
+      <td>${analysisStatusLabel(item.p.analysisStatus)}</td>
+      <td></td>
+    </tr>` : `
+    <tr data-repo="${item.r.full_name}">
+      <td class="pname"><a class="repo-table-link" href="${item.r.html_url}" target="_blank" rel="noopener">${item.r.name}</a>${awaitingTagHTML('repo')}</td>
+      <td>${item.r.description || ''}</td>
+      <td>${item.r.private ? 'Private' : 'Public'}${item.r.language ? ' · ' + item.r.language : ''}</td>
+      <td>${repoAddButtonHTML(item.r.full_name)}</td>
     </tr>`).join('');
+  tbody.querySelectorAll('.awaiting-row-project').forEach(row => row.onclick = () => openDetailFromAwaiting(row.dataset.pid));
 }
 
-function renderReposGrid(){
-  const el = document.getElementById('repos-view-grid');
-  const unmapped = unmappedRepos();
-  if(!unmapped.length){ el.innerHTML = `<div class="repo-empty">Every synced repo is mapped to a project.</div>`; return; }
-  el.innerHTML = unmapped.map(r => `
-    <div class="repo-card" data-repo="${r.full_name}">
-      <div class="repo-name"><a href="${r.html_url}" target="_blank" rel="noopener">${r.name}</a></div>
-      ${r.description ? `<div class="repo-desc">${r.description}</div>` : ''}
-      <div class="repo-meta">${repoMetaHTML(r)}</div>
-      ${repoAddButtonHTML(r.full_name)}
+function renderAwaitingGrid(){
+  const el = document.getElementById('awaiting-view-grid');
+  const items = awaitingAnalysisItems();
+  if(!items.length){ el.innerHTML = `<div class="repo-empty">Nothing awaiting analysis right now.</div>`; return; }
+  el.innerHTML = items.map(item => item.kind === 'project' ? `
+    <div class="repo-card awaiting-card-project" data-pid="${item.p.id}">
+      <div class="repo-name">${item.p.name}${awaitingTagHTML('project')}</div>
+      <div class="repo-desc">${item.p.venture}${item.p.repoFullName ? ` · ${item.p.repoFullName}` : ''}</div>
+      <div class="repo-meta">${analysisStatusLabel(item.p.analysisStatus)}</div>
+    </div>` : `
+    <div class="repo-card" data-repo="${item.r.full_name}">
+      <div class="repo-name"><a href="${item.r.html_url}" target="_blank" rel="noopener">${item.r.name}</a>${awaitingTagHTML('repo')}</div>
+      ${item.r.description ? `<div class="repo-desc">${item.r.description}</div>` : ''}
+      <div class="repo-meta">${repoMetaHTML(item.r)}</div>
+      ${repoAddButtonHTML(item.r.full_name)}
     </div>`).join('');
+  el.querySelectorAll('.awaiting-card-project').forEach(c => c.onclick = () => openDetailFromAwaiting(c.dataset.pid));
 }
 
-function renderReposGallery(){
-  const el = document.getElementById('repos-view-gallery');
-  const unmapped = unmappedRepos();
-  if(!unmapped.length){ el.innerHTML = `<div class="repo-empty">Every synced repo is mapped to a project.</div>`; return; }
-  el.innerHTML = unmapped.map(r => `
-    <div class="repo-gcard" data-repo="${r.full_name}">
-      <div class="thumb">${repoThumbSVG(r.name)}</div>
+function renderAwaitingGallery(){
+  const el = document.getElementById('awaiting-view-gallery');
+  const items = awaitingAnalysisItems();
+  if(!items.length){ el.innerHTML = `<div class="repo-empty">Nothing awaiting analysis right now.</div>`; return; }
+  el.innerHTML = items.map(item => item.kind === 'project' ? `
+    <div class="repo-gcard awaiting-card-project" data-pid="${item.p.id}">
+      <div class="thumb">${thumbSVG(item.p.map)}</div>
       <div class="gbody">
-        <div class="repo-name"><a href="${r.html_url}" target="_blank" rel="noopener">${r.name}</a></div>
-        ${r.description ? `<div class="repo-desc">${r.description}</div>` : ''}
-        <div class="repo-meta">${repoMetaHTML(r)}</div>
-        ${repoAddButtonHTML(r.full_name)}
+        <div class="repo-name">${item.p.name}${awaitingTagHTML('project')}</div>
+        <div class="repo-desc">${item.p.venture}${item.p.repoFullName ? ` · ${item.p.repoFullName}` : ''}</div>
+        <div class="repo-meta">${analysisStatusLabel(item.p.analysisStatus)}</div>
+      </div>
+    </div>` : `
+    <div class="repo-gcard" data-repo="${item.r.full_name}">
+      <div class="thumb">${repoThumbSVG(item.r.name)}</div>
+      <div class="gbody">
+        <div class="repo-name"><a href="${item.r.html_url}" target="_blank" rel="noopener">${item.r.name}</a>${awaitingTagHTML('repo')}</div>
+        ${item.r.description ? `<div class="repo-desc">${item.r.description}</div>` : ''}
+        <div class="repo-meta">${repoMetaHTML(item.r)}</div>
+        ${repoAddButtonHTML(item.r.full_name)}
       </div>
     </div>`).join('');
+  el.querySelectorAll('.awaiting-card-project').forEach(c => c.onclick = () => openDetailFromAwaiting(c.dataset.pid));
 }
 
-function updateRailReposBadge(){
-  const n = unmappedRepos().length;
-  const badge = document.getElementById('railReposBadge');
+function updateAwaitingBadge(){
+  const n = awaitingAnalysisItems().length;
+  const badge = document.getElementById('railAwaitingBadge');
   badge.textContent = n;
   badge.style.display = n > 0 ? 'flex' : 'none';
 }
 
-function renderReposPage(){
-  renderReposList(); renderReposGrid(); renderReposGallery();
-  updateRailReposBadge();
+function renderAwaitingPage(){
+  renderAwaitingList(); renderAwaitingGrid(); renderAwaitingGallery();
+  updateAwaitingBadge();
 }
 
 function slugify(s){
@@ -1418,7 +1488,8 @@ async function addRepoAsProject(fullName){
   });
 
   renderKanban(); renderList(); renderGrid(); renderGallery();
-  renderReposPage();
+  renderAwaitingPage();
+  returnToAwaiting = true;
   openDetail(id);
 }
 
@@ -1428,7 +1499,7 @@ async function init(){
   renderList();
   renderGrid();
   renderGallery();
-  updateRailReposBadge();
+  renderAwaitingPage();
 }
 init();
 </script>
